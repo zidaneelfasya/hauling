@@ -1,0 +1,558 @@
+"use client";
+
+import React, { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
+import {
+  getPayroll,
+  createPayroll,
+  updatePayroll,
+  deletePayroll,
+  calculateDriverIncentive
+} from "@/app/actions/payroll";
+import { getDrivers } from "@/app/actions/driver";
+import { toast } from "@/hooks/use-toast";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from "@/components/ui/select";
+import { Plus, Search, Edit2, Trash2, Loader2, Sparkles, Filter, Receipt } from "lucide-react";
+
+export default function PayrollPage() {
+  const queryClient = useQueryClient();
+  const [monthFilter, setMonthFilter] = useState("ALL");
+  const [yearFilter, setYearFilter] = useState("2026");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [editPay, setEditPay] = useState<any>(null);
+  const [isPulling, setIsPulling] = useState(false);
+
+  // Form Fields
+  const [driverId, setDriverId] = useState("");
+  const [bulan, setBulan] = useState(6);
+  const [tahun, setTahun] = useState(2026);
+  const [gajiPokok, setGajiPokok] = useState(4500000);
+  const [insentifRitase, setInsentifRitase] = useState(0);
+  const [bonus, setBonus] = useState(0);
+  const [potongan, setPotongan] = useState(0);
+  const [status, setStatus] = useState<"Draft" | "Paid">("Draft");
+
+  // Fetch session profile
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single()
+          .then(({ data }) => {
+            setUserProfile(data);
+          });
+      }
+    });
+  }, []);
+
+  const isManager = userProfile && ["Owner", "Full Access", "Admin"].includes(userProfile.role);
+  const isDriver = userProfile?.role === "Driver";
+
+  // Queries
+  const { data: payrolls = [], isLoading } = useQuery({
+    queryKey: ["payroll"],
+    queryFn: getPayroll,
+  });
+
+  const { data: drivers = [] } = useQuery({
+    queryKey: ["drivers-active"],
+    queryFn: async () => {
+      const all = await getDrivers();
+      return all.filter((d) => d.status === "Aktif");
+    }
+  });
+
+  // Mutators
+  const createMutation = useMutation({
+    mutationFn: createPayroll,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      toast({ title: "Sukses", description: "Slip gaji berhasil dibuat", type: "success" });
+      closeDialog();
+    },
+    onError: (err: any) => {
+      toast({ title: "Gagal", description: err.message || "Gagal membuat slip gaji", type: "error" });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => updatePayroll(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      toast({ title: "Sukses", description: "Slip gaji berhasil diperbarui", type: "success" });
+      closeDialog();
+    },
+    onError: (err: any) => {
+      toast({ title: "Gagal", description: err.message || "Gagal memperbarui slip gaji", type: "error" });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deletePayroll,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      toast({ title: "Sukses", description: "Slip gaji berhasil dihapus", type: "success" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Gagal", description: err.message || "Gagal menghapus slip gaji", type: "error" });
+    }
+  });
+
+  const openAddDialog = () => {
+    setEditPay(null);
+    setDriverId(drivers[0]?.id || "");
+    setBulan(6);
+    setTahun(2026);
+    setGajiPokok(4500000);
+    setInsentifRitase(0);
+    setBonus(0);
+    setPotongan(0);
+    setStatus("Draft");
+    setIsOpen(true);
+  };
+
+  const openEditDialog = (p: any) => {
+    setEditPay(p);
+    setDriverId(p.driver_id);
+    setBulan(p.bulan);
+    setTahun(p.tahun);
+    setGajiPokok(Number(p.gaji_pokok));
+    setInsentifRitase(Number(p.insentif_ritase));
+    setBonus(Number(p.bonus));
+    setPotongan(Number(p.potongan));
+    setStatus(p.status);
+    setIsOpen(true);
+  };
+
+  const closeDialog = () => {
+    setIsOpen(false);
+  };
+
+  // Pull driver incentives automatically from approved trips
+  const pullIncentive = async () => {
+    if (!driverId) {
+      toast({ title: "Peringatan", description: "Pilih driver terlebih dahulu", type: "warning" });
+      return;
+    }
+    setIsPulling(true);
+    try {
+      const incentive = await calculateDriverIncentive(driverId, bulan, tahun);
+      setInsentifRitase(incentive);
+      toast({
+        title: "Kalkulasi Berhasil",
+        description: `Insentif Ritase Terhitung: Rp ${incentive.toLocaleString()}`,
+        type: "success"
+      });
+    } catch (err: any) {
+      toast({ title: "Kalkulasi Gagal", description: err.message || "Gagal menarik insentif", type: "error" });
+    } finally {
+      setIsPulling(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!driverId) {
+      toast({ title: "Peringatan", description: "Pilih driver terlebih dahulu", type: "warning" });
+      return;
+    }
+
+    const payload = {
+      driver_id: driverId,
+      bulan: Number(bulan),
+      tahun: Number(tahun),
+      gaji_pokok: Number(gajiPokok),
+      insentif_ritase: Number(insentifRitase),
+      bonus: Number(bonus),
+      potongan: Number(potongan),
+      status,
+    };
+
+    if (editPay) {
+      updateMutation.mutate({ id: editPay.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("Apakah Anda yakin ingin menghapus slip gaji ini?")) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  // Real-time computed total salary in form
+  const computedTotal = useMemo(() => {
+    return gajiPokok + insentifRitase + bonus - potongan;
+  }, [gajiPokok, insentifRitase, bonus, potongan]);
+
+  const filteredPayrolls = useMemo(() => {
+    return payrolls.filter((p) => {
+      const matchMonth = monthFilter === "ALL" || p.bulan === Number(monthFilter);
+      const matchYear = yearFilter === "ALL" || p.tahun === Number(yearFilter);
+      return matchMonth && matchYear;
+    });
+  }, [payrolls, monthFilter, yearFilter]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredPayrolls.length / itemsPerPage);
+  const paginatedPayrolls = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredPayrolls.slice(start, start + itemsPerPage);
+  }, [filteredPayrolls, currentPage]);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const getMonthName = (m: number) => {
+    const names = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    return names[m - 1] || "";
+  };
+
+  const formatCurrency = (val: number) => {
+    return "Rp " + val.toLocaleString("id-ID");
+  };
+
+  return (
+    <div className="space-y-6 select-none animate-in fade-in duration-300">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight">Payroll Gaji Driver</h1>
+          <p className="text-xs text-muted-foreground">Kalkulasi gaji pokok, bonus ritase, dan potongan driver</p>
+        </div>
+        {isManager && (
+          <Button onClick={openAddDialog} className="bg-orange-500 hover:bg-orange-600 text-white gap-2 text-xs">
+            <Plus size={16} /> Buat Gaji Baru
+          </Button>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex items-center gap-2">
+          <Filter size={16} className="text-muted-foreground shrink-0" />
+          <Select value={monthFilter} onValueChange={(val) => { setMonthFilter(val); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[150px] text-xs h-9 bg-card">
+              <SelectValue placeholder="Pilih Bulan" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Bulan</SelectItem>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <SelectItem key={i} value={String(i + 1)}>
+                  {getMonthName(i + 1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Select value={yearFilter} onValueChange={(val) => { setYearFilter(val); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[120px] text-xs h-9 bg-card">
+              <SelectValue placeholder="Pilih Tahun" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="2026">2026</SelectItem>
+              <SelectItem value="2025">2025</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      ) : (
+        <div className="border rounded-lg bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Driver</TableHead>
+                <TableHead className="text-xs">NIK</TableHead>
+                <TableHead className="text-xs">Periode</TableHead>
+                <TableHead className="text-xs text-right">Gaji Pokok</TableHead>
+                <TableHead className="text-xs text-right">Insentif Ritase</TableHead>
+                <TableHead className="text-xs text-right">Bonus / Potongan</TableHead>
+                <TableHead className="text-xs text-right">Total Gaji Diterima</TableHead>
+                <TableHead className="text-xs text-center">Status</TableHead>
+                {isManager && <TableHead className="text-xs text-right">Aksi</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedPayrolls.map((p) => (
+                <TableRow key={p.id} className="hover:bg-muted/30">
+                  <TableCell className="text-xs font-semibold text-foreground">{p.driver?.nama}</TableCell>
+                  <TableCell className="text-xs font-mono">{p.driver?.nik}</TableCell>
+                  <TableCell className="text-xs font-semibold">{getMonthName(p.bulan)} {p.tahun}</TableCell>
+                  <TableCell className="text-xs text-right">{formatCurrency(Number(p.gaji_pokok))}</TableCell>
+                  <TableCell className="text-xs text-right text-emerald-500 font-medium">+{formatCurrency(Number(p.insentif_ritase))}</TableCell>
+                  <TableCell className="text-xs text-right">
+                    <div className="text-emerald-500 text-[10px]">+{formatCurrency(Number(p.bonus))}</div>
+                    <div className="text-rose-500 text-[10px]">-{formatCurrency(Number(p.potongan))}</div>
+                  </TableCell>
+                  <TableCell className="text-xs text-right font-extrabold text-foreground">{formatCurrency(Number(p.total_gaji))}</TableCell>
+                  <TableCell className="text-xs text-center">
+                    <span
+                      className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold border ${
+                        p.status === "Paid"
+                          ? "bg-emerald-950/40 border-emerald-800 text-emerald-400"
+                          : "bg-zinc-900 border-zinc-700 text-zinc-400"
+                      }`}
+                    >
+                      {p.status}
+                    </span>
+                  </TableCell>
+                  {isManager && (
+                    <TableCell className="text-xs text-right space-x-1">
+                      <Button onClick={() => openEditDialog(p)} variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                        <Edit2 size={14} />
+                      </Button>
+                      <Button onClick={() => handleDelete(p.id)} variant="ghost" size="icon" className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10">
+                        <Trash2 size={14} />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+              {filteredPayrolls.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={isManager ? 9 : 8} className="text-center py-10 text-xs text-muted-foreground">
+                    Tidak ada slip gaji driver dalam periode terpilih.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between p-4 border-t">
+              <span className="text-xs text-muted-foreground">
+                Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredPayrolls.length)} dari {filteredPayrolls.length} slip
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs px-2 py-1 h-8"
+                >
+                  Prev
+                </Button>
+                {Array.from({ length: totalPages }).map((_, i) => (
+                  <Button
+                    key={i}
+                    onClick={() => handlePageChange(i + 1)}
+                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    size="sm"
+                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === i + 1 ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+                  >
+                    {i + 1}
+                  </Button>
+                ))}
+                <Button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs px-2 py-1 h-8"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Form Dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold">
+              {editPay ? "Edit Slip Gaji Driver" : "Buat Slip Gaji Baru"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Kalkulasi gaji total driver berdasarkan data ritase yang tervalidasi.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Driver</label>
+              <Select value={driverId} onValueChange={setDriverId}>
+                <SelectTrigger className="text-xs h-9 bg-card">
+                  <SelectValue placeholder="Pilih Driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.nama}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Bulan</label>
+                <Select value={String(bulan)} onValueChange={(val) => setBulan(Number(val))}>
+                  <SelectTrigger className="text-xs h-9 bg-card">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <SelectItem key={i} value={String(i + 1)}>
+                        {getMonthName(i + 1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Tahun</label>
+                <Select value={String(tahun)} onValueChange={(val) => setTahun(Number(val))}>
+                  <SelectTrigger className="text-xs h-9 bg-card">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2026">2026</SelectItem>
+                    <SelectItem value="2025">2025</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Gaji Pokok (Rp)</label>
+                <Input
+                  type="number"
+                  value={gajiPokok}
+                  onChange={(e) => setGajiPokok(Math.max(0, Number(e.target.value)))}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">Insentif Ritase</label>
+                  <button
+                    type="button"
+                    onClick={pullIncentive}
+                    disabled={isPulling}
+                    className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-orange-500 hover:text-orange-600 disabled:opacity-50"
+                  >
+                    <Sparkles size={10} /> Auto-Pull
+                  </button>
+                </div>
+                <Input
+                  type="number"
+                  value={insentifRitase}
+                  onChange={(e) => setInsentifRitase(Math.max(0, Number(e.target.value)))}
+                  className="text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Bonus (Rp)</label>
+                <Input
+                  type="number"
+                  value={bonus}
+                  onChange={(e) => setBonus(Math.max(0, Number(e.target.value)))}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Potongan (Rp)</label>
+                <Input
+                  type="number"
+                  value={potongan}
+                  onChange={(e) => setPotongan(Math.max(0, Number(e.target.value)))}
+                  className="text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Status Pembayaran</label>
+              <Select value={status} onValueChange={(val: any) => setStatus(val)}>
+                <SelectTrigger className="text-xs h-9 bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Draft">Draft (Belum Dibayar)</SelectItem>
+                  <SelectItem value="Paid">Paid (Sudah Ditransfer)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Total Take Home Pay</span>
+                <span className="font-extrabold text-sm text-foreground">
+                  {formatCurrency(computedTotal)}
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={closeDialog} className="text-xs h-9">
+                Batal
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="bg-orange-500 hover:bg-orange-600 text-white text-xs h-9">
+                {(createMutation.isPending || updateMutation.isPending) ? "Menyimpan..." : "Simpan Slip"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -27,6 +27,11 @@ export async function getDrivers() {
     .from("driver")
     .select(`
       *,
+      kontrak_hauling (
+        id,
+        kode_kontrak,
+        perusahaan
+      ),
       profiles (
         id,
         nama,
@@ -48,6 +53,7 @@ export async function createDriver(formData: {
   tanggal_masuk: string;
   status: "Aktif" | "Nonaktif";
   profile_id?: string | null;
+  kontrak_hauling_id?: string | null;
 }) {
   await verifyManagerRole();
   const supabase = await createClient();
@@ -55,6 +61,7 @@ export async function createDriver(formData: {
   const insertData = {
     ...formData,
     profile_id: formData.profile_id || null,
+    kontrak_hauling_id: formData.kontrak_hauling_id || null,
   };
 
   const { data, error } = await supabase
@@ -65,7 +72,7 @@ export async function createDriver(formData: {
 
   if (error) throw error;
   await writeAuditLog(`Menambahkan Driver Baru: ${formData.nama}`, formData);
-  revalidatePath("/protected/drivers");
+  revalidatePath("/dashboard/drivers");
   return data;
 }
 
@@ -81,6 +88,7 @@ export async function updateDriver(
     tanggal_masuk: string;
     status: "Aktif" | "Nonaktif";
     profile_id?: string | null;
+    kontrak_hauling_id?: string | null;
   }
 ) {
   await verifyManagerRole();
@@ -89,6 +97,7 @@ export async function updateDriver(
   const updateData = {
     ...formData,
     profile_id: formData.profile_id || null,
+    kontrak_hauling_id: formData.kontrak_hauling_id || null,
   };
 
   const { data, error } = await supabase
@@ -100,7 +109,7 @@ export async function updateDriver(
 
   if (error) throw error;
   await writeAuditLog(`Mengubah Driver: ${formData.nama}`, formData);
-  revalidatePath("/protected/drivers");
+  revalidatePath("/dashboard/drivers");
   return data;
 }
 
@@ -122,7 +131,7 @@ export async function deleteDriver(id: string, nama: string) {
   const { error } = await supabase.from("driver").delete().eq("id", id);
   if (error) throw error;
   await writeAuditLog(`Menghapus Driver: ${nama}`, { id });
-  revalidatePath("/protected/drivers");
+  revalidatePath("/dashboard/drivers");
   return true;
 }
 

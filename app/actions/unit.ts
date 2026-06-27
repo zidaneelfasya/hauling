@@ -25,7 +25,14 @@ export async function getUnits() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("unit")
-    .select("*")
+    .select(`
+      *,
+      kontrak_hauling (
+        id,
+        kode_kontrak,
+        perusahaan
+      )
+    `)
     .order("kode_unit", { ascending: true });
   if (error) throw error;
   return data;
@@ -39,18 +46,27 @@ export async function createUnit(formData: {
   tahun: number;
   kapasitas_ton: number;
   status: "Aktif" | "Maintenance" | "Rusak" | "Nonaktif";
+  kontrak_hauling_id?: string | null;
+  biaya_sewa: number;
+  durasi_sewa_bulan: number;
 }) {
   await verifyManagerRole();
   const supabase = await createClient();
+  
+  const insertData = {
+    ...formData,
+    kontrak_hauling_id: formData.kontrak_hauling_id || null,
+  };
+
   const { data, error } = await supabase
     .from("unit")
-    .insert(formData)
+    .insert(insertData)
     .select()
     .single();
 
   if (error) throw error;
   await writeAuditLog(`Menambahkan Unit Baru: ${formData.kode_unit}`, formData);
-  revalidatePath("/protected/units");
+  revalidatePath("/dashboard/units");
   return data;
 }
 
@@ -64,20 +80,29 @@ export async function updateUnit(
     tahun: number;
     kapasitas_ton: number;
     status: "Aktif" | "Maintenance" | "Rusak" | "Nonaktif";
+    kontrak_hauling_id?: string | null;
+    biaya_sewa: number;
+    durasi_sewa_bulan: number;
   }
 ) {
   await verifyManagerRole();
   const supabase = await createClient();
+  
+  const updateData = {
+    ...formData,
+    kontrak_hauling_id: formData.kontrak_hauling_id || null,
+  };
+
   const { data, error } = await supabase
     .from("unit")
-    .update(formData)
+    .update(updateData)
     .eq("id", id)
     .select()
     .single();
 
   if (error) throw error;
   await writeAuditLog(`Mengubah Unit: ${formData.kode_unit}`, formData);
-  revalidatePath("/protected/units");
+  revalidatePath("/dashboard/units");
   return data;
 }
 
@@ -100,6 +125,6 @@ export async function deleteUnit(id: string, kode_unit: string) {
   const { error } = await supabase.from("unit").delete().eq("id", id);
   if (error) throw error;
   await writeAuditLog(`Menghapus Unit: ${kode_unit}`, { id });
-  revalidatePath("/protected/units");
+  revalidatePath("/dashboard/units");
   return true;
 }

@@ -29,7 +29,7 @@ export async function getInvoices() {
     .from("invoice")
     .select(`
       *,
-      pelanggan (id, nama_perusahaan, pic, nomor_hp, alamat)
+      kontrak_hauling (id, kode_kontrak, perusahaan, tanggal_mulai, tanggal_selesai)
     `)
     .order("tanggal_invoice", { ascending: false });
 
@@ -40,7 +40,7 @@ export async function getInvoices() {
 export async function createInvoice(formData: {
   nomor_invoice: string;
   tanggal_invoice: string;
-  pelanggan_id: string;
+  kontrak_hauling_id: string;
   periode: string;
   total_tagihan: number;
   status: "Draft" | "Sent" | "Paid";
@@ -59,8 +59,8 @@ export async function createInvoice(formData: {
 
   if (error) throw error;
 
-  await writeAuditLog(`Membuat Invoice baru ${formData.nomor_invoice} untuk pelanggan ID ${formData.pelanggan_id}: Total Rp${Number(formData.total_tagihan).toLocaleString()}`, formData);
-  revalidatePath("/protected/invoices");
+  await writeAuditLog(`Membuat Invoice baru ${formData.nomor_invoice} untuk kontrak ID ${formData.kontrak_hauling_id}: Total Rp${Number(formData.total_tagihan).toLocaleString()}`, formData);
+  revalidatePath("/dashboard/invoices");
   return data;
 }
 
@@ -69,7 +69,7 @@ export async function updateInvoice(
   formData: {
     nomor_invoice: string;
     tanggal_invoice: string;
-    pelanggan_id: string;
+    kontrak_hauling_id: string;
     periode: string;
     total_tagihan: number;
     status: "Draft" | "Sent" | "Paid";
@@ -91,7 +91,7 @@ export async function updateInvoice(
   if (error) throw error;
 
   await writeAuditLog(`Mengubah Invoice ID ${id}: Nomor ${formData.nomor_invoice}, Status ${formData.status}`, formData);
-  revalidatePath("/protected/invoices");
+  revalidatePath("/dashboard/invoices");
   return data;
 }
 
@@ -106,7 +106,7 @@ export async function deleteInvoice(id: string, nomor: string) {
   if (error) throw error;
 
   await writeAuditLog(`Menghapus Invoice: ${nomor}`, { id });
-  revalidatePath("/protected/invoices");
+  revalidatePath("/dashboard/invoices");
   return true;
 }
 

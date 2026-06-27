@@ -61,7 +61,7 @@ export async function createBBM(formData: {
   if (error) throw error;
 
   await writeAuditLog(`Mencatat BBM baru: Unit ${formData.unit_id}, Total Biaya Rp${total_biaya.toLocaleString()}`, insertData);
-  revalidatePath("/protected/bbm");
+  revalidatePath("/dashboard/bbm");
   return data;
 }
 
@@ -95,7 +95,7 @@ export async function updateBBM(
   if (error) throw error;
 
   await writeAuditLog(`Mengubah BBM ID ${id}: Rp${total_biaya.toLocaleString()}`, updateData);
-  revalidatePath("/protected/bbm");
+  revalidatePath("/dashboard/bbm");
   return data;
 }
 
@@ -107,6 +107,6 @@ export async function deleteBBM(id: string) {
   if (error) throw error;
 
   await writeAuditLog(`Menghapus BBM ID ${id}`);
-  revalidatePath("/protected/bbm");
+  revalidatePath("/dashboard/bbm");
   return true;
 }

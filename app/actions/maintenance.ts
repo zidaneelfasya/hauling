@@ -59,7 +59,7 @@ export async function createMaintenance(formData: {
   if (error) throw error;
 
   await writeAuditLog(`Mencatat Maintenance baru: Unit ${formData.unit_id}, Biaya Rp${Number(formData.biaya).toLocaleString()}`, formData);
-  revalidatePath("/protected/maintenance");
+  revalidatePath("/dashboard/maintenance");
   return data;
 }
 
@@ -111,7 +111,7 @@ export async function updateMaintenance(
   if (error) throw error;
 
   await writeAuditLog(`Mengubah data Maintenance ID ${id}: Status ${formData.status}`, updateData);
-  revalidatePath("/protected/maintenance");
+  revalidatePath("/dashboard/maintenance");
   return data;
 }
 
@@ -126,6 +126,6 @@ export async function deleteMaintenance(id: string) {
   if (error) throw error;
 
   await writeAuditLog(`Menghapus Maintenance ID ${id}`);
-  revalidatePath("/protected/maintenance");
+  revalidatePath("/dashboard/maintenance");
   return true;
 }

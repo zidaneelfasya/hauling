@@ -45,7 +45,16 @@ export async function getPayroll() {
     .from("payroll")
     .select(`
       *,
-      driver (id, nama, nik)
+      driver (
+        id,
+        nama,
+        nik,
+        kontrak_hauling (
+          id,
+          kode_kontrak,
+          perusahaan
+        )
+      )
     `)
     .order("tahun", { ascending: false })
     .order("bulan", { ascending: false });
@@ -64,31 +73,22 @@ export async function calculateDriverIncentive(driverId: string, bulan: number, 
   await verifyManagerRole();
   const supabase = await createClient();
 
-  const { data: ritaseList, error } = await supabase
-    .from("ritase")
-    .select("total_pendapatan, tanggal")
-    .eq("driver_id", driverId)
-    .eq("status", "Approved");
+  const { data: driver, error } = await supabase
+    .from("driver")
+    .select("accumulated_ritase")
+    .eq("id", driverId)
+    .single();
 
   if (error) throw error;
-
-  const filtered = ritaseList.filter(item => {
-    const parts = item.tanggal.split("-");
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    return y === tahun && m === bulan;
-  });
-
-  const totalIncentive = filtered.reduce((sum, item) => sum + Number(item.total_pendapatan), 0);
-  return totalIncentive;
+  return driver?.accumulated_ritase || 0;
 }
 
 export async function createPayroll(formData: {
   driver_id: string;
   bulan: number;
   tahun: number;
-  gaji_pokok: number;
-  insentif_ritase: number;
+  jumlah_ritase: number;
+  tarif_per_ritase: number;
   bonus: number;
   potongan: number;
   status: "Draft" | "Paid";
@@ -96,7 +96,7 @@ export async function createPayroll(formData: {
   await verifyManagerRole();
   const supabase = await createClient();
 
-  const total_gaji = Number(formData.gaji_pokok) + Number(formData.insentif_ritase) + Number(formData.bonus) - Number(formData.potongan);
+  const total_gaji = (Number(formData.jumlah_ritase) * Number(formData.tarif_per_ritase)) + Number(formData.bonus) - Number(formData.potongan);
 
   const insertData = {
     ...formData,
@@ -112,7 +112,7 @@ export async function createPayroll(formData: {
   if (error) throw error;
 
   await writeAuditLog(`Membuat Payroll Driver ID ${formData.driver_id} Periode ${formData.bulan}/${formData.tahun}: Gaji Rp${total_gaji.toLocaleString()}`, insertData);
-  revalidatePath("/protected/payroll");
+  revalidatePath("/dashboard/payroll");
   return data;
 }
 
@@ -122,8 +122,8 @@ export async function updatePayroll(
     driver_id: string;
     bulan: number;
     tahun: number;
-    gaji_pokok: number;
-    insentif_ritase: number;
+    jumlah_ritase: number;
+    tarif_per_ritase: number;
     bonus: number;
     potongan: number;
     status: "Draft" | "Paid";
@@ -132,7 +132,7 @@ export async function updatePayroll(
   await verifyManagerRole();
   const supabase = await createClient();
 
-  const total_gaji = Number(formData.gaji_pokok) + Number(formData.insentif_ritase) + Number(formData.bonus) - Number(formData.potongan);
+  const total_gaji = (Number(formData.jumlah_ritase) * Number(formData.tarif_per_ritase)) + Number(formData.bonus) - Number(formData.potongan);
 
   const updateData = {
     ...formData,
@@ -149,7 +149,7 @@ export async function updatePayroll(
   if (error) throw error;
 
   await writeAuditLog(`Mengubah Payroll ID ${id}: Total Gaji Rp${total_gaji.toLocaleString()}`, updateData);
-  revalidatePath("/protected/payroll");
+  revalidatePath("/dashboard/payroll");
   return data;
 }
 
@@ -161,6 +161,6 @@ export async function deletePayroll(id: string) {
   if (error) throw error;
 
   await writeAuditLog(`Menghapus Payroll ID ${id}`);
-  revalidatePath("/protected/payroll");
+  revalidatePath("/dashboard/payroll");
   return true;
 }

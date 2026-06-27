@@ -42,7 +42,8 @@ export async function getRitase() {
       driver (id, nama, nik),
       lokasi_loading (id, nama_lokasi),
       lokasi_dumping (id, nama_lokasi),
-      profiles:approved_by (id, nama)
+      profiles:approved_by (id, nama),
+      bbm!ritase_id (id, liter, harga_per_liter)
     `)
     .order("tanggal", { ascending: false });
 
@@ -60,6 +61,7 @@ export async function getRitase() {
 
 export async function createRitase(formData: {
   tanggal: string;
+  kontrak_hauling_id: string;
   unit_id: string;
   driver_id: string;
   lokasi_loading_id: string;
@@ -67,6 +69,10 @@ export async function createRitase(formData: {
   jumlah_ritase: number;
   tonase: number;
   tarif_per_ritase: number;
+  jenis_pengiriman: string;
+  volume_bbm: number;
+  harga_per_liter_bbm: number;
+  keterangan_tarif?: string;
   status?: "Draft" | "Approved" | "Rejected";
 }) {
   const { profile, driverRecord } = await getUserInfo();
@@ -81,32 +87,58 @@ export async function createRitase(formData: {
     finalStatus = "Draft";
   }
 
+  const biaya_bbm = Number(formData.volume_bbm || 0) * Number(formData.harga_per_liter_bbm || 0);
   const total_pendapatan = Number(formData.jumlah_ritase) * Number(formData.tarif_per_ritase);
 
   const insertData = {
-    ...formData,
+    tanggal: formData.tanggal,
+    kontrak_hauling_id: formData.kontrak_hauling_id,
+    unit_id: formData.unit_id,
     driver_id: finalDriverId,
+    lokasi_loading_id: formData.lokasi_loading_id,
+    lokasi_dumping_id: formData.lokasi_dumping_id,
+    jumlah_ritase: formData.jumlah_ritase,
+    tonase: formData.tonase,
+    tarif_per_ritase: formData.tarif_per_ritase,
+    jenis_pengiriman: formData.jenis_pengiriman,
+    biaya_bbm,
+    keterangan_tarif: formData.keterangan_tarif || null,
     status: finalStatus,
-    total_pendapatan,
   };
 
-  const { data, error } = await supabase
+  const { data: ritaseData, error: ritaseErr } = await supabase
     .from("ritase")
     .insert(insertData)
     .select()
     .single();
 
-  if (error) throw error;
+  if (ritaseErr) throw ritaseErr;
+
+  if (Number(formData.volume_bbm || 0) > 0 && Number(formData.harga_per_liter_bbm || 0) > 0) {
+    const { error: bbmErr } = await supabase
+      .from("bbm")
+      .insert({
+        tanggal: formData.tanggal,
+        unit_id: formData.unit_id,
+        liter: formData.volume_bbm,
+        harga_per_liter: formData.harga_per_liter_bbm,
+        total_biaya: biaya_bbm,
+        lokasi_pengisian: "Ritase BBM",
+        ritase_id: ritaseData.id,
+      });
+    if (bbmErr) throw bbmErr;
+  }
 
   await writeAuditLog(`Mencatat Ritase baru: Unit ${formData.unit_id}, Total Pendapatan Rp${total_pendapatan.toLocaleString()}`, insertData);
-  revalidatePath("/protected/ritase");
-  return data;
+  revalidatePath("/dashboard/ritase");
+  return ritaseData;
 }
 
 export async function updateRitase(
   id: string,
   formData: {
     tanggal: string;
+    kontrak_hauling_id: string;
     unit_id: string;
     driver_id: string;
     lokasi_loading_id: string;
@@ -114,6 +146,10 @@ export async function updateRitase(
     jumlah_ritase: number;
     tonase: number;
     tarif_per_ritase: number;
+    jenis_pengiriman: string;
+    volume_bbm: number;
+    harga_per_liter_bbm: number;
+    keterangan_tarif?: string;
     status?: "Draft" | "Approved" | "Rejected";
   }
 ) {
@@ -137,11 +173,23 @@ export async function updateRitase(
     }
   }
 
+  const biaya_bbm = Number(formData.volume_bbm || 0) * Number(formData.harga_per_liter_bbm || 0);
   const total_pendapatan = Number(formData.jumlah_ritase) * Number(formData.tarif_per_ritase);
 
   const updateData: any = {
-    ...formData,
-    total_pendapatan,
+    tanggal: formData.tanggal,
+    kontrak_hauling_id: formData.kontrak_hauling_id,
+    unit_id: formData.unit_id,
+    driver_id: formData.driver_id,
+    lokasi_loading_id: formData.lokasi_loading_id,
+    lokasi_dumping_id: formData.lokasi_dumping_id,
+    jumlah_ritase: formData.jumlah_ritase,
+    tonase: formData.tonase,
+    tarif_per_ritase: formData.tarif_per_ritase,
+    jenis_pengiriman: formData.jenis_pengiriman,
+    biaya_bbm,
+    keterangan_tarif: formData.keterangan_tarif || null,
+    status: formData.status || existing.status,
   };
 
   if (profile.role === "Driver") {
@@ -152,18 +200,55 @@ export async function updateRitase(
     updateData.driver_id = driverRecord.id;
   }
 
-  const { data, error } = await supabase
+  const { data: ritaseData, error: ritaseErr } = await supabase
     .from("ritase")
     .update(updateData)
     .eq("id", id)
     .select()
     .single();
 
-  if (error) throw error;
+  if (ritaseErr) throw ritaseErr;
+
+  if (Number(formData.volume_bbm || 0) > 0 && Number(formData.harga_per_liter_bbm || 0) > 0) {
+    const { data: existingBbm } = await supabase
+      .from("bbm")
+      .select("id")
+      .eq("ritase_id", id)
+      .maybeSingle();
+
+    if (existingBbm) {
+      const { error: bbmUpdateErr } = await supabase
+        .from("bbm")
+        .update({
+          tanggal: formData.tanggal,
+          unit_id: formData.unit_id,
+          liter: formData.volume_bbm,
+          harga_per_liter: formData.harga_per_liter_bbm,
+          total_biaya: biaya_bbm,
+        })
+        .eq("id", existingBbm.id);
+      if (bbmUpdateErr) throw bbmUpdateErr;
+    } else {
+      const { error: bbmInsertErr } = await supabase
+        .from("bbm")
+        .insert({
+          tanggal: formData.tanggal,
+          unit_id: formData.unit_id,
+          liter: formData.volume_bbm,
+          harga_per_liter: formData.harga_per_liter_bbm,
+          total_biaya: biaya_bbm,
+          lokasi_pengisian: "Ritase BBM",
+          ritase_id: id,
+        });
+      if (bbmInsertErr) throw bbmInsertErr;
+    }
+  } else {
+    await supabase.from("bbm").delete().eq("ritase_id", id);
+  }
 
   await writeAuditLog(`Mengubah Ritase ID ${id}: Rp${total_pendapatan.toLocaleString()}`, updateData);
-  revalidatePath("/protected/ritase");
-  return data;
+  revalidatePath("/dashboard/ritase");
+  return ritaseData;
 }
 
 export async function deleteRitase(id: string) {
@@ -178,7 +263,7 @@ export async function deleteRitase(id: string) {
   if (error) throw error;
 
   await writeAuditLog(`Menghapus Ritase ID ${id}`);
-  revalidatePath("/protected/ritase");
+  revalidatePath("/dashboard/ritase");
   return true;
 }
 
@@ -205,7 +290,7 @@ export async function approveRitase(id: string) {
   if (error) throw error;
 
   await writeAuditLog(`Menyetujui (Approve) Ritase ID ${id}`, data);
-  revalidatePath("/protected/ritase");
+  revalidatePath("/dashboard/ritase");
   return data;
 }
 
@@ -232,6 +317,6 @@ export async function rejectRitase(id: string, reason: string) {
   if (error) throw error;
 
   await writeAuditLog(`Menolak (Reject) Ritase ID ${id} dengan alasan: ${reason}`, data);
-  revalidatePath("/protected/ritase");
+  revalidatePath("/dashboard/ritase");
   return data;
 }

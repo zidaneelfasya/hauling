@@ -1,4 +1,4 @@
-"use client";
+/*  */"use client";
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/maintenance";
 import { getUnits } from "@/app/actions/unit";
 import { toast } from "@/hooks/use-toast";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import {
   Table,
   TableHeader,
@@ -49,15 +50,16 @@ export default function MaintenancePage() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [editMaint, setEditMaint] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Form Fields
   const [tanggal, setTanggal] = useState("");
   const [unitId, setUnitId] = useState("");
   const [jenisMaintenance, setJenisMaintenance] = useState("");
   const [deskripsi, setDeskripsi] = useState("");
-  const [biaya, setBiaya] = useState(0);
+  const [biaya, setBiaya] = useState<string>("0");
   const [vendor, setVendor] = useState("");
-  const [kilometer, setKilometer] = useState(0);
+  const [kilometer, setKilometer] = useState<string>("0");
   const [status, setStatus] = useState<"Scheduled" | "In Progress" | "Completed">("Scheduled");
 
   // Fetch session profile
@@ -133,9 +135,9 @@ export default function MaintenancePage() {
     setUnitId(units[0]?.id || "");
     setJenisMaintenance("");
     setDeskripsi("");
-    setBiaya(0);
+    setBiaya("0");
     setVendor("");
-    setKilometer(0);
+    setKilometer("0");
     setStatus("Scheduled");
     setIsOpen(true);
   };
@@ -146,9 +148,9 @@ export default function MaintenancePage() {
     setUnitId(m.unit_id);
     setJenisMaintenance(m.jenis_maintenance);
     setDeskripsi(m.deskripsi);
-    setBiaya(Number(m.biaya));
+    setBiaya(String(m.biaya));
     setVendor(m.vendor);
-    setKilometer(Number(m.kilometer));
+    setKilometer(String(m.kilometer));
     setStatus(m.status);
     setIsOpen(true);
   };
@@ -169,9 +171,9 @@ export default function MaintenancePage() {
       unit_id: unitId,
       jenis_maintenance: jenisMaintenance,
       deskripsi,
-      biaya: Number(biaya),
+      biaya: Number(biaya) || 0,
       vendor,
-      kilometer: Number(kilometer),
+      kilometer: Number(kilometer) || 0,
       status,
     };
 
@@ -183,9 +185,7 @@ export default function MaintenancePage() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus log maintenance ini?")) {
-      deleteMutation.mutate(id);
-    }
+    setDeleteId(id);
   };
 
   const filteredLogs = useMemo(() => {
@@ -211,6 +211,20 @@ export default function MaintenancePage() {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
+  };
+
+  const getPaginationGroup = () => {
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const end = Math.min(totalPages, Math.max(currentPage + 2, 5));
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return {
+      pages,
+      showLeftEllipsis: start > 1,
+      showRightEllipsis: end < totalPages
+    };
   };
 
   return (
@@ -300,7 +314,7 @@ export default function MaintenancePage() {
                     </TableCell>
                     <TableCell className="text-xs">{m.vendor}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{Number(m.kilometer).toLocaleString()} Km</TableCell>
-                    <TableCell className="text-xs text-right font-semibold text-rose-400">
+                    <TableCell className="text-xs text-right font-semibold text-rose-600 dark:text-rose-400">
                       Rp{Number(m.biaya).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-xs text-center">
@@ -308,10 +322,10 @@ export default function MaintenancePage() {
                         <span
                           className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold border ${
                             m.status === "Completed"
-                              ? "bg-emerald-950/40 border-emerald-800 text-emerald-400"
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
                               : m.status === "In Progress"
-                              ? "bg-amber-950/40 border-amber-800 text-amber-400"
-                              : "bg-blue-950/40 border-blue-800 text-blue-400"
+                              ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400"
+                              : "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400"
                           }`}
                         >
                           {m.status}
@@ -367,17 +381,19 @@ export default function MaintenancePage() {
                 >
                   Prev
                 </Button>
-                {Array.from({ length: totalPages }).map((_, i) => (
+                {getPaginationGroup().showLeftEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
+                {getPaginationGroup().pages.map((p) => (
                   <Button
-                    key={i}
-                    onClick={() => handlePageChange(i + 1)}
-                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    variant={currentPage === p ? "default" : "outline"}
                     size="sm"
-                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === i + 1 ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === p ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
                   >
-                    {i + 1}
+                    {p}
                   </Button>
                 ))}
+                {getPaginationGroup().showRightEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
                 <Button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -469,7 +485,7 @@ export default function MaintenancePage() {
                     <Input
                       type="number"
                       value={kilometer}
-                      onChange={(e) => setKilometer(Math.max(0, Number(e.target.value)))}
+                      onChange={(e) => setKilometer(e.target.value)}
                       className="text-xs h-9"
                     />
                   </div>
@@ -480,7 +496,7 @@ export default function MaintenancePage() {
                   <Input
                     type="number"
                     value={biaya}
-                    onChange={(e) => setBiaya(Math.max(0, Number(e.target.value)))}
+                    onChange={(e) => setBiaya(e.target.value)}
                     className="text-xs h-9"
                   />
                 </div>
@@ -525,6 +541,19 @@ export default function MaintenancePage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        isOpen={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        onConfirm={() => {
+          if (deleteId) {
+            deleteMutation.mutate(deleteId);
+            setDeleteId(null);
+          }
+        }}
+        title="Hapus Log Perbaikan"
+        description="Apakah Anda yakin ingin menghapus log maintenance ini? Tindakan ini tidak dapat dibatalkan."
+      />
     </div>
   );
 }

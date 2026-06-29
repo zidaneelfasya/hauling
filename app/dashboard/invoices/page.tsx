@@ -10,8 +10,9 @@ import {
   deleteInvoice,
   getNextInvoiceNumber
 } from "@/app/actions/invoice";
-import { getPelanggan } from "@/app/actions/master";
+import { getKontrakHauling } from "@/app/actions/master";
 import { toast } from "@/hooks/use-toast";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import {
   Table,
   TableHeader,
@@ -51,13 +52,15 @@ export default function InvoicesPage() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [editInvoice, setEditInvoice] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteNomor, setDeleteNomor] = useState("");
 
   // Form Fields
   const [nomorInvoice, setNomorInvoice] = useState("");
   const [tanggalInvoice, setTanggalInvoice] = useState("");
-  const [pelangganId, setPelangganId] = useState("");
+  const [kontrakHaulingId, setKontrakHaulingId] = useState("");
   const [periode, setPeriode] = useState("");
-  const [totalTagihan, setTotalTagihan] = useState(50000000);
+  const [totalTagihan, setTotalTagihan] = useState<string>("50000000");
   const [status, setStatus] = useState<"Draft" | "Sent" | "Paid">("Draft");
 
   // Fetch session profile
@@ -86,9 +89,9 @@ export default function InvoicesPage() {
     queryFn: getInvoices,
   });
 
-  const { data: pelangganList = [] } = useQuery({
-    queryKey: ["pelanggan"],
-    queryFn: getPelanggan,
+  const { data: kontrakList = [] } = useQuery({
+    queryKey: ["kontrak_hauling"],
+    queryFn: getKontrakHauling,
   });
 
   // Mutators
@@ -136,9 +139,9 @@ export default function InvoicesPage() {
       setNomorInvoice(`INV/HMS/${new Date().getFullYear()}/0001`);
     }
     setTanggalInvoice(new Date().toISOString().substring(0, 10));
-    setPelangganId(pelangganList[0]?.id || "");
+    setKontrakHaulingId(kontrakList[0]?.id || "");
     setPeriode("Juni 2026");
-    setTotalTagihan(150000000);
+    setTotalTagihan("150000000");
     setStatus("Draft");
     setIsOpen(true);
   };
@@ -147,9 +150,9 @@ export default function InvoicesPage() {
     setEditInvoice(inv);
     setNomorInvoice(inv.nomor_invoice);
     setTanggalInvoice(inv.tanggal_invoice);
-    setPelangganId(inv.pelanggan_id);
+    setKontrakHaulingId(inv.kontrak_hauling_id);
     setPeriode(inv.periode);
-    setTotalTagihan(Number(inv.total_tagihan));
+    setTotalTagihan(String(inv.total_tagihan));
     setStatus(inv.status);
     setIsOpen(true);
   };
@@ -160,7 +163,7 @@ export default function InvoicesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomorInvoice || !tanggalInvoice || !pelangganId || !periode) {
+    if (!nomorInvoice || !tanggalInvoice || !kontrakHaulingId || !periode) {
       toast({ title: "Peringatan", description: "Semua kolom wajib diisi", type: "warning" });
       return;
     }
@@ -168,9 +171,9 @@ export default function InvoicesPage() {
     const payload = {
       nomor_invoice: nomorInvoice,
       tanggal_invoice: tanggalInvoice,
-      pelanggan_id: pelangganId,
+      kontrak_hauling_id: kontrakHaulingId,
       periode,
-      total_tagihan: Number(totalTagihan),
+      total_tagihan: Number(totalTagihan) || 0,
       status,
     };
 
@@ -182,9 +185,8 @@ export default function InvoicesPage() {
   };
 
   const handleDelete = (id: string, nomor: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus invoice ${nomor}?`)) {
-      deleteMutation.mutate({ id, nomor });
-    }
+    setDeleteId(id);
+    setDeleteNomor(nomor);
   };
 
   // PDF Generation Function
@@ -243,9 +245,9 @@ export default function InvoicesPage() {
       doc.setFont("helvetica", "bold");
       doc.text("DITAGIHKAN KEPADA (CUSTOMER):", leftMargin + 5, y + 6);
       doc.setFont("helvetica", "normal");
-      doc.text(`Perusahaan: ${inv.pelanggan?.nama_perusahaan}`, leftMargin + 5, y + 12);
-      doc.text(`PIC / No. HP: ${inv.pelanggan?.pic} (${inv.pelanggan?.nomor_hp})`, leftMargin + 5, y + 18);
-      doc.text(`Alamat: ${inv.pelanggan?.alamat}`, leftMargin + 5, y + 24);
+      doc.text(`Perusahaan: ${inv.kontrak_hauling?.perusahaan}`, leftMargin + 5, y + 12);
+      doc.text(`Kode Kontrak: ${inv.kontrak_hauling?.kode_kontrak}`, leftMargin + 5, y + 18);
+      doc.text(`Periode Kontrak: ${inv.kontrak_hauling?.tanggal_mulai} s.d. ${inv.kontrak_hauling?.tanggal_selesai}`, leftMargin + 5, y + 24);
 
       // Billing Item Table headers
       y += 45;
@@ -302,7 +304,8 @@ export default function InvoicesPage() {
     return invoices.filter((inv) => {
       const matchSearch =
         inv.nomor_invoice.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inv.pelanggan?.nama_perusahaan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inv.kontrak_hauling?.perusahaan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inv.kontrak_hauling?.kode_kontrak.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inv.periode.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchStatus = statusFilter === "ALL" || inv.status === statusFilter;
@@ -321,6 +324,20 @@ export default function InvoicesPage() {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
+  };
+
+  const getPaginationGroup = () => {
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const end = Math.min(totalPages, Math.max(currentPage + 2, 5));
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return {
+      pages,
+      showLeftEllipsis: start > 1,
+      showRightEllipsis: end < totalPages
+    };
   };
 
   return (
@@ -398,8 +415,8 @@ export default function InvoicesPage() {
                   <TableCell className="text-xs font-semibold text-orange-500">{inv.nomor_invoice}</TableCell>
                   <TableCell className="text-xs font-mono">{inv.tanggal_invoice}</TableCell>
                   <TableCell className="text-xs">
-                    <div className="font-semibold text-foreground">{inv.pelanggan?.nama_perusahaan}</div>
-                    <div className="text-[10px] text-muted-foreground">PIC: {inv.pelanggan?.pic} ({inv.pelanggan?.nomor_hp})</div>
+                    <div className="font-semibold text-foreground">{inv.kontrak_hauling?.perusahaan}</div>
+                    <div className="text-[10px] text-muted-foreground">Kontrak: {inv.kontrak_hauling?.kode_kontrak}</div>
                   </TableCell>
                   <TableCell className="text-xs font-medium">{inv.periode}</TableCell>
                   <TableCell className="text-xs text-right font-extrabold text-foreground">{formatCurrency(Number(inv.total_tagihan))}</TableCell>
@@ -407,10 +424,10 @@ export default function InvoicesPage() {
                     <span
                       className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold border ${
                         inv.status === "Paid"
-                          ? "bg-emerald-950/40 border-emerald-800 text-emerald-400"
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
                           : inv.status === "Sent"
-                          ? "bg-blue-950/40 border-blue-800 text-blue-400"
-                          : "bg-zinc-900 border-zinc-700 text-zinc-400"
+                          ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400"
+                          : "bg-zinc-100 border-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-400"
                       }`}
                     >
                       {inv.status}
@@ -418,7 +435,7 @@ export default function InvoicesPage() {
                   </TableCell>
                   <TableCell className="text-xs text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button onClick={() => handleGeneratePDF(inv)} variant="ghost" size="icon" className="h-7 w-7 text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/10" title="Export PDF">
+                      <Button onClick={() => handleGeneratePDF(inv)} variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10" title="Export PDF">
                         <Download size={14} />
                       </Button>
                       {isManager && (
@@ -460,17 +477,19 @@ export default function InvoicesPage() {
                 >
                   Prev
                 </Button>
-                {Array.from({ length: totalPages }).map((_, i) => (
+                {getPaginationGroup().showLeftEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
+                {getPaginationGroup().pages.map((p) => (
                   <Button
-                    key={i}
-                    onClick={() => handlePageChange(i + 1)}
-                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    variant={currentPage === p ? "default" : "outline"}
                     size="sm"
-                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === i + 1 ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === p ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
                   >
-                    {i + 1}
+                    {p}
                   </Button>
                 ))}
+                {getPaginationGroup().showRightEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
                 <Button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -521,15 +540,15 @@ export default function InvoicesPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase">Pelanggan</label>
-                <Select value={pelangganId} onValueChange={setPelangganId}>
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Kontrak Hauling</label>
+                <Select value={kontrakHaulingId} onValueChange={setKontrakHaulingId}>
                   <SelectTrigger className="text-xs h-9 bg-card">
-                    <SelectValue placeholder="Pilih Pelanggan" />
+                    <SelectValue placeholder="Pilih Kontrak" />
                   </SelectTrigger>
                   <SelectContent>
-                    {pelangganList.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.nama_perusahaan}
+                    {kontrakList.map((k) => (
+                      <SelectItem key={k.id} value={k.id}>
+                        {k.kode_kontrak} - {k.perusahaan}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -552,7 +571,7 @@ export default function InvoicesPage() {
               <Input
                 type="number"
                 value={totalTagihan}
-                onChange={(e) => setTotalTagihan(Math.max(0, Number(e.target.value)))}
+                onChange={(e) => setTotalTagihan(e.target.value)}
                 className="text-xs h-9"
               />
             </div>
@@ -582,6 +601,19 @@ export default function InvoicesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        isOpen={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        onConfirm={() => {
+          if (deleteId) {
+            deleteMutation.mutate({ id: deleteId, nomor: deleteNomor });
+            setDeleteId(null);
+          }
+        }}
+        title="Hapus Invoice"
+        description={`Apakah Anda yakin ingin menghapus invoice ${deleteNomor}? Tindakan ini tidak dapat dibatalkan.`}
+      />
     </div>
   );
 }

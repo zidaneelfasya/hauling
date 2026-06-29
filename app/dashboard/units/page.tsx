@@ -3,7 +3,9 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getUnits, createUnit, updateUnit, deleteUnit } from "@/app/actions/unit";
+import { getKontrakHauling } from "@/app/actions/master";
 import { toast } from "@/hooks/use-toast";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import {
   Table,
   TableHeader,
@@ -40,18 +42,28 @@ export default function UnitsPage() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [editUnit, setEditUnit] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteCode, setDeleteCode] = useState("");
 
   const [kodeUnit, setKodeUnit] = useState("");
   const [nomorPolisi, setNomorPolisi] = useState("");
   const [merk, setMerk] = useState("");
   const [tipe, setTipe] = useState("");
-  const [tahun, setTahun] = useState(new Date().getFullYear());
-  const [kapasitas, setKapasitas] = useState(24);
+  const [tahun, setTahun] = useState<string>(new Date().getFullYear().toString());
+  const [kapasitas, setKapasitas] = useState<string>("24");
   const [status, setStatus] = useState<"Aktif" | "Maintenance" | "Rusak" | "Nonaktif">("Aktif");
+  const [kontrakHaulingId, setKontrakHaulingId] = useState("");
+  const [biayaSewa, setBiayaSewa] = useState<string>("0");
+  const [durasiSewaBulan, setDurasiSewaBulan] = useState<string>("1");
 
   const { data: units = [], isLoading } = useQuery({
     queryKey: ["units"],
     queryFn: getUnits,
+  });
+
+  const { data: kontrakList = [] } = useQuery({
+    queryKey: ["kontrak_hauling"],
+    queryFn: getKontrakHauling,
   });
 
   const createMutation = useMutation({
@@ -95,9 +107,12 @@ export default function UnitsPage() {
     setNomorPolisi("");
     setMerk("");
     setTipe("");
-    setTahun(new Date().getFullYear());
-    setKapasitas(24);
+    setTahun(new Date().getFullYear().toString());
+    setKapasitas("24");
     setStatus("Aktif");
+    setKontrakHaulingId("");
+    setBiayaSewa("0");
+    setDurasiSewaBulan("1");
     setIsOpen(true);
   };
 
@@ -107,9 +122,12 @@ export default function UnitsPage() {
     setNomorPolisi(u.nomor_polisi);
     setMerk(u.merk);
     setTipe(u.tipe);
-    setTahun(u.tahun);
-    setKapasitas(Number(u.kapasitas_ton));
+    setTahun(String(u.tahun));
+    setKapasitas(String(u.kapasitas_ton));
     setStatus(u.status);
+    setKontrakHaulingId(u.kontrak_hauling_id || "");
+    setBiayaSewa(String(u.biaya_sewa || 0));
+    setDurasiSewaBulan(String(u.durasi_sewa_bulan || 1));
     setIsOpen(true);
   };
 
@@ -129,9 +147,12 @@ export default function UnitsPage() {
       nomor_polisi: nomorPolisi.toUpperCase(),
       merk,
       tipe,
-      tahun: Number(tahun),
-      kapasitas_ton: Number(kapasitas),
+      tahun: Number(tahun) || new Date().getFullYear(),
+      kapasitas_ton: Number(kapasitas) || 0,
       status,
+      kontrak_hauling_id: kontrakHaulingId || null,
+      biaya_sewa: Number(biayaSewa) || 0,
+      durasi_sewa_bulan: Number(durasiSewaBulan) || 1,
     };
 
     if (editUnit) {
@@ -142,9 +163,8 @@ export default function UnitsPage() {
   };
 
   const handleDelete = (id: string, code: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus unit ${code}?`)) {
-      deleteMutation.mutate({ id, code });
-    }
+    setDeleteId(id);
+    setDeleteCode(code);
   };
 
   const filteredUnits = useMemo(() => {
@@ -171,6 +191,20 @@ export default function UnitsPage() {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
+  };
+
+  const getPaginationGroup = () => {
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const end = Math.min(totalPages, Math.max(currentPage + 2, 5));
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return {
+      pages,
+      showLeftEllipsis: start > 1,
+      showRightEllipsis: end < totalPages
+    };
   };
 
   return (
@@ -235,6 +269,8 @@ export default function UnitsPage() {
                 <TableHead className="text-xs">Merk & Tipe</TableHead>
                 <TableHead className="text-xs">Tahun</TableHead>
                 <TableHead className="text-xs text-right">Kapasitas (Ton)</TableHead>
+                <TableHead className="text-xs">Kontrak Aktif</TableHead>
+                <TableHead className="text-xs text-right">Biaya Sewa</TableHead>
                 <TableHead className="text-xs text-center">Status</TableHead>
                 <TableHead className="text-xs text-right">Aksi</TableHead>
               </TableRow>
@@ -247,16 +283,46 @@ export default function UnitsPage() {
                   <TableCell className="text-xs">{u.merk} {u.tipe}</TableCell>
                   <TableCell className="text-xs">{u.tahun}</TableCell>
                   <TableCell className="text-xs text-right">{u.kapasitas_ton} T</TableCell>
+                  <TableCell className="text-xs">
+                    {u.kontrak_hauling ? (
+                      <div className="font-semibold text-foreground">
+                        {u.kontrak_hauling.kode_kontrak}
+                        <span className="block text-[10px] text-muted-foreground font-normal">
+                          {u.kontrak_hauling.perusahaan}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground italic">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-right">
+                    {u.biaya_sewa > 0 ? (
+                      <div>
+                        <div className="font-semibold text-foreground">
+                          {new Intl.NumberFormat("id-ID", {
+                            style: "currency",
+                            currency: "IDR",
+                            maximumFractionDigits: 0,
+                          }).format(u.biaya_sewa)}
+                        </div>
+                        <span className="block text-[10px] text-muted-foreground font-normal">
+                          per {u.durasi_sewa_bulan} Bulan
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground italic">Free / Milik Sendiri</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs text-center">
                     <span
                       className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         u.status === "Aktif"
-                          ? "bg-emerald-950/40 border-emerald-800 text-emerald-400"
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
                           : u.status === "Maintenance"
-                          ? "bg-amber-950/40 border-amber-800 text-amber-400"
+                          ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400"
                           : u.status === "Rusak"
-                          ? "bg-rose-950/40 border-rose-800 text-rose-400"
-                          : "bg-zinc-900 border-zinc-700 text-zinc-400"
+                          ? "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400"
+                          : "bg-zinc-100 border-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-400"
                       }`}
                     >
                       {u.status}
@@ -274,7 +340,7 @@ export default function UnitsPage() {
               ))}
               {filteredUnits.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10 text-xs text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-10 text-xs text-muted-foreground">
                     Tidak ada unit DT yang cocok dengan filter / pencarian.
                   </TableCell>
                 </TableRow>
@@ -297,17 +363,19 @@ export default function UnitsPage() {
                 >
                   Prev
                 </Button>
-                {Array.from({ length: totalPages }).map((_, i) => (
+                {getPaginationGroup().showLeftEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
+                {getPaginationGroup().pages.map((p) => (
                   <Button
-                    key={i}
-                    onClick={() => handlePageChange(i + 1)}
-                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    variant={currentPage === p ? "default" : "outline"}
                     size="sm"
-                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === i + 1 ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === p ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
                   >
-                    {i + 1}
+                    {p}
                   </Button>
                 ))}
+                {getPaginationGroup().showRightEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
                 <Button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -383,7 +451,7 @@ export default function UnitsPage() {
                   type="number"
                   placeholder="2022"
                   value={tahun}
-                  onChange={(e) => setTahun(Number(e.target.value))}
+                  onChange={(e) => setTahun(e.target.value)}
                   className="text-xs h-9"
                 />
               </div>
@@ -393,7 +461,7 @@ export default function UnitsPage() {
                   type="number"
                   placeholder="24"
                   value={kapasitas}
-                  onChange={(e) => setKapasitas(Number(e.target.value))}
+                  onChange={(e) => setKapasitas(e.target.value)}
                   className="text-xs h-9"
                 />
               </div>
@@ -417,6 +485,49 @@ export default function UnitsPage() {
               </Select>
             </div>
 
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Kontrak Hauling</label>
+              <Select
+                value={kontrakHaulingId}
+                onValueChange={setKontrakHaulingId}
+              >
+                <SelectTrigger className="text-xs h-9 bg-card">
+                  <SelectValue placeholder="Pilih Kontrak" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">- Tanpa Kontrak -</SelectItem>
+                  {kontrakList.map((k: any) => (
+                    <SelectItem key={k.id} value={k.id}>
+                      {k.kode_kontrak} - {k.perusahaan}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Biaya Sewa (Rp)</label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={biayaSewa}
+                  onChange={(e) => setBiayaSewa(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Durasi Sewa (Bulan)</label>
+                <Input
+                  type="number"
+                  placeholder="1"
+                  value={durasiSewaBulan}
+                  onChange={(e) => setDurasiSewaBulan(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+            </div>
+
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={closeDialog} className="text-xs h-9">
                 Batal
@@ -428,6 +539,19 @@ export default function UnitsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        isOpen={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        onConfirm={() => {
+          if (deleteId) {
+            deleteMutation.mutate({ id: deleteId, code: deleteCode });
+            setDeleteId(null);
+          }
+        }}
+        title="Hapus Unit Dump Truck"
+        description={`Apakah Anda yakin ingin menghapus unit ${deleteCode}? Tindakan ini tidak dapat dibatalkan.`}
+      />
     </div>
   );
 }

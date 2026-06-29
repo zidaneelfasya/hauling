@@ -24,11 +24,8 @@ export default async function DashboardPage() {
     .eq("id", user.id)
     .single();
 
-  if (!profile) {
-    return redirect("/auth/login");
-  }
-
-  const isDriver = profile.role === "Driver";
+  const isDriver = !profile || profile.role === "Driver";
+  const hasProfile = !!profile;
 
   // Get driver record linked to user
   let driverId = null;
@@ -41,27 +38,35 @@ export default async function DashboardPage() {
     driverId = driver?.id;
   }
 
-  // 1. Fetch Fleet status
-  const { data: units } = await supabase.from("unit").select("id, status");
+  // 1. Fetch Fleet units
+  const { data: units } = await supabase
+    .from("unit")
+    .select("id, kode_unit, status, kontrak_hauling_id, biaya_sewa, durasi_sewa_bulan");
   const activeUnits = units?.filter((u) => u.status === "Aktif").length || 0;
   const maintenanceUnits = units?.filter((u) => u.status === "Maintenance").length || 0;
 
   // 2. Fetch Driver status
-  const { data: drivers } = await supabase.from("driver").select("id, status");
+  const { data: drivers } = await supabase
+    .from("driver")
+    .select("id, nama, status, kontrak_hauling_id, accumulated_ritase");
   const activeDrivers = drivers?.filter((d) => d.status === "Aktif").length || 0;
 
-  // 3. Fetch Ritase list (for current month and days)
+  // 3. Fetch Ritase list
   let ritaseQuery = supabase
     .from("ritase")
     .select(`
       id,
       tanggal,
+      kontrak_hauling_id,
+      unit_id,
+      driver_id,
       jumlah_ritase,
       tonase,
       tarif_per_ritase,
-      total_pendapatan,
+      jenis_pengiriman,
+      biaya_bbm,
+      keterangan_tarif,
       status,
-      driver_id,
       unit (kode_unit),
       driver (nama)
     `)
@@ -74,7 +79,12 @@ export default async function DashboardPage() {
   const { data: ritase } = await ritaseQuery;
 
   // 4. Fetch BBM (restricted data mapping inside dashboard)
-  const { data: bbm } = await supabase.from("bbm").select("id, tanggal, liter, total_biaya");
+  let bbmQuery = supabase.from("bbm").select("id, tanggal, unit_id, liter, total_biaya");
+  if (isDriver) {
+    // If it's a driver, they only see fuel refill logs for their assigned units or none if not applicable.
+    // For simplicity, we can load BBM normally or filter. We'll load normally since drivers only see limited UI.
+  }
+  const { data: bbm } = await bbmQuery;
 
   // 5. Fetch Maintenance
   const { data: maintenance } = await supabase
@@ -82,6 +92,7 @@ export default async function DashboardPage() {
     .select(`
       id,
       tanggal,
+      unit_id,
       biaya,
       status,
       jenis_maintenance,
@@ -98,9 +109,44 @@ export default async function DashboardPage() {
       tanggal_invoice,
       total_tagihan,
       status,
-      pelanggan (nama_perusahaan)
+      kontrak_hauling (perusahaan)
     `)
     .order("tanggal_invoice", { ascending: false });
+
+  // 7. Fetch Contracts
+  const { data: contracts } = await supabase
+    .from("kontrak_hauling")
+    .select("id, kode_kontrak, perusahaan, tanggal_mulai, tanggal_selesai, jumlah_unit, status")
+    .order("kode_kontrak", { ascending: true });
+
+  // 8. Fetch Payrolls
+  let payrollQuery = supabase
+    .from("payroll")
+    .select("id, driver_id, bulan, tahun, jumlah_ritase, tarif_per_ritase, bonus, potongan, total_gaji, status")
+    .order("tahun", { ascending: false })
+    .order("bulan", { ascending: false });
+
+  if (isDriver) {
+    payrollQuery = payrollQuery.eq("driver_id", driverId || "00000000-0000-0000-0000-000000000000");
+  }
+  const { data: payrolls } = await payrollQuery;
+
+  // 9. Fetch Cash Flow logs (Only needed for admin/owner executive metrics)
+  let cashFlow: any[] = [];
+  let operationalExpenses: any[] = [];
+  if (!isDriver) {
+    const { data: cfData } = await supabase
+      .from("cash_flow")
+      .select("*")
+      .order("tanggal", { ascending: false });
+    cashFlow = cfData || [];
+
+    const { data: opData } = await supabase
+      .from("pengeluaran_operasional")
+      .select("*")
+      .order("tanggal", { ascending: false });
+    operationalExpenses = opData || [];
+  }
 
   return (
     <DashboardView
@@ -112,6 +158,12 @@ export default async function DashboardPage() {
       maintenance={maintenance || []}
       invoices={invoices || []}
       isDriver={isDriver}
+      contracts={contracts || []}
+      units={units || []}
+      drivers={drivers || []}
+      payrolls={payrolls || []}
+      cashFlow={cashFlow}
+      operationalExpenses={operationalExpenses}
     />
   );
 }

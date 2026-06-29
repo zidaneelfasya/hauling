@@ -4,57 +4,57 @@
 
 @layer base {
   :root {
-    --background: 215 25% 98%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 218 30% 97%;
+    --foreground: 218 88% 7%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 218 88% 7%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 24.6 95% 53.1%;
-    --accent-foreground: 210 40% 98%;
+    --popover-foreground: 218 88% 7%;
+    --primary: 44 61% 49%;
+    --primary-foreground: 218 88% 7%;
+    --secondary: 218 15% 91%;
+    --secondary-foreground: 218 88% 7%;
+    --muted: 218 15% 91%;
+    --muted-foreground: 218 20% 45%;
+    --accent: 44 61% 49%;
+    --accent-foreground: 218 88% 7%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 24.6 95% 53.1%;
+    --border: 218 20% 88%;
+    --input: 218 20% 88%;
+    --ring: 44 61% 49%;
     --radius: 0.5rem;
-    --chart-1: 24.6 95% 53.1%;
-    --chart-2: 215 25% 27%;
-    --chart-3: 142.1 76.2% 36.3%;
-    --chart-4: 47.9 95.8% 53.1%;
-    --chart-5: 0 84.2% 60.2%;
+    --chart-1: 44 61% 49%;
+    --chart-2: 218 60% 25%;
+    --chart-3: 142 60% 45%;
+    --chart-4: 195 70% 50%;
+    --chart-5: 0 75% 55%;
   }
 
   .dark {
-    --background: 222.2 47.4% 7.5%;
+    --background: 218 88% 7%;
     --foreground: 210 40% 98%;
-    --card: 222.2 47.4% 9.5%;
+    --card: 218 80% 10%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 47.4% 9.5%;
+    --popover: 218 80% 10%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 14.5%;
+    --primary: 44 61% 49%;
+    --primary-foreground: 218 88% 7%;
+    --secondary: 218 40% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 14.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 24.6 95% 53.1%;
-    --accent-foreground: 210 40% 98%;
+    --muted: 218 40% 15%;
+    --muted-foreground: 218 20% 65%;
+    --accent: 44 61% 49%;
+    --accent-foreground: 218 88% 7%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 14.5%;
-    --input: 217.2 32.6% 14.5%;
-    --ring: 24.6 95% 53.1%;
-    --chart-1: 24.6 95% 53.1%;
-    --chart-2: 215 20.2% 65.1%;
-    --chart-3: 142.1 70.2% 45.3%;
-    --chart-4: 47.9 95.8% 53.1%;
+    --border: 218 40% 16%;
+    --input: 218 40% 16%;
+    --ring: 44 61% 49%;
+    --chart-1: 44 61% 49%;
+    --chart-2: 218 60% 35%;
+    --chart-3: 142 60% 50%;
+    --chart-4: 195 70% 55%;
     --chart-5: 0 62.8% 30.6%;
   }
 }
@@ -67,4 +67,15 @@
     @apply bg-background text-foreground;
     font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   }
+}
+
+/* Disable spinner arrows in number inputs globally */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/payroll";
 import { getDrivers } from "@/app/actions/driver";
 import { toast } from "@/hooks/use-toast";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import {
   Table,
   TableHeader,
@@ -51,15 +52,16 @@ export default function PayrollPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editPay, setEditPay] = useState<any>(null);
   const [isPulling, setIsPulling] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Form Fields
   const [driverId, setDriverId] = useState("");
   const [bulan, setBulan] = useState(6);
   const [tahun, setTahun] = useState(2026);
-  const [gajiPokok, setGajiPokok] = useState(4500000);
-  const [insentifRitase, setInsentifRitase] = useState(0);
-  const [bonus, setBonus] = useState(0);
-  const [potongan, setPotongan] = useState(0);
+  const [jumlahRitase, setJumlahRitase] = useState<string>("0");
+  const [tarifPerRitase, setTarifPerRitase] = useState<string>("50000");
+  const [bonus, setBonus] = useState<string>("0");
+  const [potongan, setPotongan] = useState<string>("0");
   const [status, setStatus] = useState<"Draft" | "Paid">("Draft");
 
   // Fetch session profile
@@ -95,6 +97,16 @@ export default function PayrollPage() {
       return all.filter((d) => d.status === "Aktif");
     }
   });
+
+  // Autofill driver accumulated ritase count
+  useEffect(() => {
+    if (driverId && !editPay) {
+      const selectedDriver = drivers.find((d: any) => d.id === driverId);
+      if (selectedDriver) {
+        setJumlahRitase(String(selectedDriver.accumulated_ritase || 0));
+      }
+    }
+  }, [driverId, drivers, editPay]);
 
   // Mutators
   const createMutation = useMutation({
@@ -137,10 +149,10 @@ export default function PayrollPage() {
     setDriverId(drivers[0]?.id || "");
     setBulan(6);
     setTahun(2026);
-    setGajiPokok(4500000);
-    setInsentifRitase(0);
-    setBonus(0);
-    setPotongan(0);
+    setJumlahRitase("0");
+    setTarifPerRitase("50000");
+    setBonus("0");
+    setPotongan("0");
     setStatus("Draft");
     setIsOpen(true);
   };
@@ -150,10 +162,10 @@ export default function PayrollPage() {
     setDriverId(p.driver_id);
     setBulan(p.bulan);
     setTahun(p.tahun);
-    setGajiPokok(Number(p.gaji_pokok));
-    setInsentifRitase(Number(p.insentif_ritase));
-    setBonus(Number(p.bonus));
-    setPotongan(Number(p.potongan));
+    setJumlahRitase(String(p.jumlah_ritase || 0));
+    setTarifPerRitase(String(p.tarif_per_ritase || 50000));
+    setBonus(String(p.bonus));
+    setPotongan(String(p.potongan));
     setStatus(p.status);
     setIsOpen(true);
   };
@@ -170,11 +182,11 @@ export default function PayrollPage() {
     }
     setIsPulling(true);
     try {
-      const incentive = await calculateDriverIncentive(driverId, bulan, tahun);
-      setInsentifRitase(incentive);
+      const accumulatedTrips = await calculateDriverIncentive(driverId, bulan, tahun);
+      setJumlahRitase(String(accumulatedTrips));
       toast({
         title: "Kalkulasi Berhasil",
-        description: `Insentif Ritase Terhitung: Rp ${incentive.toLocaleString()}`,
+        description: `Jumlah Ritase Terhitung: ${accumulatedTrips} Rit`,
         type: "success"
       });
     } catch (err: any) {
@@ -195,8 +207,8 @@ export default function PayrollPage() {
       driver_id: driverId,
       bulan: Number(bulan),
       tahun: Number(tahun),
-      gaji_pokok: Number(gajiPokok),
-      insentif_ritase: Number(insentifRitase),
+      jumlah_ritase: Number(jumlahRitase),
+      tarif_per_ritase: Number(tarifPerRitase),
       bonus: Number(bonus),
       potongan: Number(potongan),
       status,
@@ -210,15 +222,13 @@ export default function PayrollPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus slip gaji ini?")) {
-      deleteMutation.mutate(id);
-    }
+    setDeleteId(id);
   };
 
   // Real-time computed total salary in form
   const computedTotal = useMemo(() => {
-    return gajiPokok + insentifRitase + bonus - potongan;
-  }, [gajiPokok, insentifRitase, bonus, potongan]);
+    return ((Number(jumlahRitase) || 0) * (Number(tarifPerRitase) || 0)) + (Number(bonus) || 0) - (Number(potongan) || 0);
+  }, [jumlahRitase, tarifPerRitase, bonus, potongan]);
 
   const filteredPayrolls = useMemo(() => {
     return payrolls.filter((p) => {
@@ -239,6 +249,20 @@ export default function PayrollPage() {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
+  };
+
+  const getPaginationGroup = () => {
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const end = Math.min(totalPages, Math.max(currentPage + 2, 5));
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return {
+      pages,
+      showLeftEllipsis: start > 1,
+      showRightEllipsis: end < totalPages
+    };
   };
 
   const getMonthName = (m: number) => {
@@ -312,8 +336,8 @@ export default function PayrollPage() {
                 <TableHead className="text-xs">Driver</TableHead>
                 <TableHead className="text-xs">NIK</TableHead>
                 <TableHead className="text-xs">Periode</TableHead>
-                <TableHead className="text-xs text-right">Gaji Pokok</TableHead>
-                <TableHead className="text-xs text-right">Insentif Ritase</TableHead>
+                <TableHead className="text-xs text-right">Banyaknya Ritase</TableHead>
+                <TableHead className="text-xs text-right">Tarif / Ritase</TableHead>
                 <TableHead className="text-xs text-right">Bonus / Potongan</TableHead>
                 <TableHead className="text-xs text-right">Total Gaji Diterima</TableHead>
                 <TableHead className="text-xs text-center">Status</TableHead>
@@ -323,22 +347,29 @@ export default function PayrollPage() {
             <TableBody>
               {paginatedPayrolls.map((p) => (
                 <TableRow key={p.id} className="hover:bg-muted/30">
-                  <TableCell className="text-xs font-semibold text-foreground">{p.driver?.nama}</TableCell>
+                  <TableCell className="text-xs">
+                    <div className="font-semibold text-foreground">{p.driver?.nama}</div>
+                    {p.driver?.kontrak_hauling && (
+                      <div className="text-[9px] text-orange-500 font-semibold tracking-tight leading-none mt-0.5" title={p.driver.kontrak_hauling.perusahaan}>
+                        {p.driver.kontrak_hauling.kode_kontrak} - {p.driver.kontrak_hauling.perusahaan}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs font-mono">{p.driver?.nik}</TableCell>
                   <TableCell className="text-xs font-semibold">{getMonthName(p.bulan)} {p.tahun}</TableCell>
-                  <TableCell className="text-xs text-right">{formatCurrency(Number(p.gaji_pokok))}</TableCell>
-                  <TableCell className="text-xs text-right text-emerald-500 font-medium">+{formatCurrency(Number(p.insentif_ritase))}</TableCell>
+                  <TableCell className="text-xs text-right font-medium">{p.jumlah_ritase} Rit</TableCell>
+                  <TableCell className="text-xs text-right font-medium">{formatCurrency(Number(p.tarif_per_ritase))}</TableCell>
                   <TableCell className="text-xs text-right">
-                    <div className="text-emerald-500 text-[10px]">+{formatCurrency(Number(p.bonus))}</div>
-                    <div className="text-rose-500 text-[10px]">-{formatCurrency(Number(p.potongan))}</div>
+                    <div className="text-emerald-600 dark:text-emerald-400 text-[10px]">+{formatCurrency(Number(p.bonus))}</div>
+                    <div className="text-rose-600 dark:text-rose-400 text-[10px]">-{formatCurrency(Number(p.potongan))}</div>
                   </TableCell>
                   <TableCell className="text-xs text-right font-extrabold text-foreground">{formatCurrency(Number(p.total_gaji))}</TableCell>
                   <TableCell className="text-xs text-center">
                     <span
                       className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold border ${
                         p.status === "Paid"
-                          ? "bg-emerald-950/40 border-emerald-800 text-emerald-400"
-                          : "bg-zinc-900 border-zinc-700 text-zinc-400"
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
+                          : "bg-zinc-100 border-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-400"
                       }`}
                     >
                       {p.status}
@@ -381,17 +412,19 @@ export default function PayrollPage() {
                 >
                   Prev
                 </Button>
-                {Array.from({ length: totalPages }).map((_, i) => (
+                {getPaginationGroup().showLeftEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
+                {getPaginationGroup().pages.map((p) => (
                   <Button
-                    key={i}
-                    onClick={() => handlePageChange(i + 1)}
-                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    variant={currentPage === p ? "default" : "outline"}
                     size="sm"
-                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === i + 1 ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === p ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
                   >
-                    {i + 1}
+                    {p}
                   </Button>
                 ))}
+                {getPaginationGroup().showRightEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
                 <Button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -468,18 +501,8 @@ export default function PayrollPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase">Gaji Pokok (Rp)</label>
-                <Input
-                  type="number"
-                  value={gajiPokok}
-                  onChange={(e) => setGajiPokok(Math.max(0, Number(e.target.value)))}
-                  className="text-xs h-9"
-                />
-              </div>
-
-              <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-muted-foreground uppercase">Insentif Ritase</label>
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase">Banyaknya Ritase</label>
                   <button
                     type="button"
                     onClick={pullIncentive}
@@ -491,8 +514,18 @@ export default function PayrollPage() {
                 </div>
                 <Input
                   type="number"
-                  value={insentifRitase}
-                  onChange={(e) => setInsentifRitase(Math.max(0, Number(e.target.value)))}
+                  value={jumlahRitase}
+                  onChange={(e) => setJumlahRitase(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Tarif per-Ritase (Rp)</label>
+                <Input
+                  type="number"
+                  value={tarifPerRitase}
+                  onChange={(e) => setTarifPerRitase(e.target.value)}
                   className="text-xs h-9"
                 />
               </div>
@@ -504,7 +537,7 @@ export default function PayrollPage() {
                 <Input
                   type="number"
                   value={bonus}
-                  onChange={(e) => setBonus(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setBonus(e.target.value)}
                   className="text-xs h-9"
                 />
               </div>
@@ -514,7 +547,7 @@ export default function PayrollPage() {
                 <Input
                   type="number"
                   value={potongan}
-                  onChange={(e) => setPotongan(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setPotongan(e.target.value)}
                   className="text-xs h-9"
                 />
               </div>
@@ -553,6 +586,19 @@ export default function PayrollPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        isOpen={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        onConfirm={() => {
+          if (deleteId) {
+            deleteMutation.mutate(deleteId);
+            setDeleteId(null);
+          }
+        }}
+        title="Hapus Slip Gaji"
+        description="Apakah Anda yakin ingin menghapus slip gaji ini? Tindakan ini tidak dapat dibatalkan."
+      />
     </div>
   );
 }

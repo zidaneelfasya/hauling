@@ -81,6 +81,20 @@ export default function AuditLogsPage() {
     }
   };
 
+  const getPaginationGroup = () => {
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const end = Math.min(totalPages, Math.max(currentPage + 2, 5));
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return {
+      pages,
+      showLeftEllipsis: start > 1,
+      showRightEllipsis: end < totalPages
+    };
+  };
+
   const formatTimestamp = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleString("id-ID", {
@@ -131,7 +145,7 @@ export default function AuditLogsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
         </div>
       ) : error ? (
-        <div className="text-center py-10 text-xs text-rose-400">
+        <div className="text-center py-10 text-xs text-rose-600 dark:text-rose-400">
           Gagal mengambil data log: {(error as any).message || "Silakan hubungi administrator"}
         </div>
       ) : (
@@ -221,17 +235,19 @@ export default function AuditLogsPage() {
                 >
                   Prev
                 </Button>
-                {Array.from({ length: totalPages }).map((_, i) => (
+                {getPaginationGroup().showLeftEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
+                {getPaginationGroup().pages.map((p) => (
                   <Button
-                    key={i}
-                    onClick={() => handlePageChange(i + 1)}
-                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    variant={currentPage === p ? "default" : "outline"}
                     size="sm"
-                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === i + 1 ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === p ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
                   >
-                    {i + 1}
+                    {p}
                   </Button>
                 ))}
+                {getPaginationGroup().showRightEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
                 <Button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}

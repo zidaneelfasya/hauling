@@ -15,7 +15,7 @@ export function Navbar() {
     const href = "/" + pathSegments.slice(0, index + 1).join("/");
     
     let label = segment;
-    if (segment === "protected") label = "Dashboard";
+    if (segment === "dashboard") label = "Dashboard";
     else if (segment === "units") label = "Armada Unit DT";
     else if (segment === "drivers") label = "Driver";
     else if (segment === "ritase") label = "Ritase";
@@ -35,7 +35,7 @@ export function Navbar() {
     return { label, href, isLast };
   });
 
-  const isDashboardOnly = pathSegments.length === 1 && pathSegments[0] === "protected";
+  const isDashboardOnly = pathSegments.length === 1 && pathSegments[0] === "dashboard";
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-6 h-16 bg-background/95 backdrop-blur border-b select-none">
@@ -47,7 +47,7 @@ export function Navbar() {
           <span className="text-sm font-semibold text-foreground">Dashboard</span>
         ) : (
           <div className="flex items-center gap-1.5 text-sm">
-            <Link href="/protected" className="text-muted-foreground hover:text-foreground font-medium transition-colors">
+            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground font-medium transition-colors">
               Dashboard
             </Link>
             {breadcrumbs.filter(b => b.label !== "Dashboard").map((crumb) => (

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import QueryProvider from "@/components/providers/query-provider";
+import LenisProvider from "@/components/providers/lenis-provider";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
@@ -29,7 +30,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            {children}
+            <LenisProvider>
+              {children}
+            </LenisProvider>
             <Toaster />
           </QueryProvider>
         </ThemeProvider>

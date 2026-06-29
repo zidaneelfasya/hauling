@@ -13,6 +13,19 @@ export default {
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        orange: {
+          50: "#fdf8ec",
+          100: "#fbf0d3",
+          200: "#f6ddaa",
+          300: "#f0c375",
+          400: "#e9a544",
+          500: "#caa030", // Horizon Gold
+          600: "#b58724", // Horizon Gold Hover
+          700: "#97671b",
+          800: "#7c511b",
+          900: "#664319",
+          950: "#3b220b",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",

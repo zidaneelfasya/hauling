@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getBBM, createBBM, updateBBM, deleteBBM } from "@/app/actions/bbm";
 import { getUnits } from "@/app/actions/unit";
 import { toast } from "@/hooks/use-toast";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import {
   Table,
   TableHeader,
@@ -43,12 +44,13 @@ export default function BBMPage() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [editLog, setEditLog] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Form Fields
   const [tanggal, setTanggal] = useState("");
   const [unitId, setUnitId] = useState("");
-  const [liter, setLiter] = useState(100);
-  const [hargaPerLiter, setHargaPerLiter] = useState(13500);
+  const [liter, setLiter] = useState<string>("100");
+  const [hargaPerLiter, setHargaPerLiter] = useState<string>("13500");
   const [lokasiPengisian, setLokasiPengisian] = useState("");
 
   // Fetch session profile
@@ -124,8 +126,8 @@ export default function BBMPage() {
     setEditLog(null);
     setTanggal(new Date().toISOString().substring(0, 10));
     setUnitId(units[0]?.id || "");
-    setLiter(100);
-    setHargaPerLiter(13500);
+    setLiter("100");
+    setHargaPerLiter("13500");
     setLokasiPengisian("SPBU Morowali");
     setIsOpen(true);
   };
@@ -134,8 +136,8 @@ export default function BBMPage() {
     setEditLog(log);
     setTanggal(log.tanggal);
     setUnitId(log.unit_id);
-    setLiter(Number(log.liter));
-    setHargaPerLiter(Number(log.harga_per_liter));
+    setLiter(String(log.liter));
+    setHargaPerLiter(String(log.harga_per_liter));
     setLokasiPengisian(log.lokasi_pengisian);
     setIsOpen(true);
   };
@@ -154,8 +156,8 @@ export default function BBMPage() {
     const payload = {
       tanggal,
       unit_id: unitId,
-      liter: Number(liter),
-      harga_per_liter: Number(hargaPerLiter),
+      liter: Number(liter) || 0,
+      harga_per_liter: Number(hargaPerLiter) || 0,
       lokasi_pengisian: lokasiPengisian,
     };
 
@@ -167,14 +169,12 @@ export default function BBMPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus log BBM ini?")) {
-      deleteMutation.mutate(id);
-    }
+    setDeleteId(id);
   };
 
   // Real-time computed total biaya
   const computedTotal = useMemo(() => {
-    return liter * hargaPerLiter;
+    return (Number(liter) || 0) * (Number(hargaPerLiter) || 0);
   }, [liter, hargaPerLiter]);
 
   const filteredLogs = useMemo(() => {
@@ -197,6 +197,20 @@ export default function BBMPage() {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
+  };
+
+  const getPaginationGroup = () => {
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const end = Math.min(totalPages, Math.max(currentPage + 2, 5));
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return {
+      pages,
+      showLeftEllipsis: start > 1,
+      showRightEllipsis: end < totalPages
+    };
   };
 
   return (
@@ -253,7 +267,7 @@ export default function BBMPage() {
                   <TableCell className="text-xs font-bold text-orange-500">{log.unit?.kode_unit}</TableCell>
                   <TableCell className="text-xs font-medium">{log.liter} L</TableCell>
                   <TableCell className="text-xs text-right">Rp{Number(log.harga_per_liter).toLocaleString()}</TableCell>
-                  <TableCell className="text-xs text-right font-semibold text-rose-400">
+                  <TableCell className="text-xs text-right font-semibold text-rose-600 dark:text-rose-400">
                     Rp{Number(log.total_biaya).toLocaleString()}
                   </TableCell>
                   <TableCell className="text-xs font-semibold">{log.lokasi_pengisian}</TableCell>
@@ -294,17 +308,19 @@ export default function BBMPage() {
                 >
                   Prev
                 </Button>
-                {Array.from({ length: totalPages }).map((_, i) => (
+                {getPaginationGroup().showLeftEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
+                {getPaginationGroup().pages.map((p) => (
                   <Button
-                    key={i}
-                    onClick={() => handlePageChange(i + 1)}
-                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    variant={currentPage === p ? "default" : "outline"}
                     size="sm"
-                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === i + 1 ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+                    className={`text-xs px-2.5 py-1 h-8 ${currentPage === p ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
                   >
-                    {i + 1}
+                    {p}
                   </Button>
                 ))}
+                {getPaginationGroup().showRightEllipsis && <span className="text-xs text-muted-foreground px-1">...</span>}
                 <Button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -377,7 +393,7 @@ export default function BBMPage() {
                   type="number"
                   min="1"
                   value={liter}
-                  onChange={(e) => setLiter(Math.max(1, Number(e.target.value)))}
+                  onChange={(e) => setLiter(e.target.value)}
                   className="text-xs h-9"
                 />
               </div>
@@ -387,7 +403,7 @@ export default function BBMPage() {
                 <Input
                   type="number"
                   value={hargaPerLiter}
-                  onChange={(e) => setHargaPerLiter(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setHargaPerLiter(e.target.value)}
                   className="text-xs h-9"
                 />
               </div>
@@ -413,6 +429,19 @@ export default function BBMPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        isOpen={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        onConfirm={() => {
+          if (deleteId) {
+            deleteMutation.mutate(deleteId);
+            setDeleteId(null);
+          }
+        }}
+        title="Hapus Log BBM"
+        description="Apakah Anda yakin ingin menghapus log BBM ini? Tindakan ini tidak dapat dibatalkan."
+      />
     </div>
   );
 }

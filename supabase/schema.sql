@@ -27,7 +27,6 @@ CREATE TABLE public.kontrak_hauling (
     perusahaan TEXT NOT NULL,
     tanggal_mulai DATE NOT NULL,
     tanggal_selesai DATE NOT NULL,
-    jumlah_unit INTEGER NOT NULL,
     status TEXT NOT NULL CONSTRAINT chk_kontrak_status CHECK (status IN ('Aktif', 'Selesai', 'Nonaktif')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -200,6 +199,7 @@ CREATE TABLE public.cash_flow (
     keterangan TEXT,
     source_type TEXT NOT NULL DEFAULT 'Manual' CONSTRAINT chk_cash_flow_source_type CHECK (source_type IN ('Manual', 'BBM', 'Payroll', 'Operational', 'Invoice')),
     source_id UUID,
+    kontrak_hauling_id UUID REFERENCES public.kontrak_hauling(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -230,6 +230,7 @@ CREATE INDEX idx_ritase_kontrak_hauling ON public.ritase(kontrak_hauling_id);
 CREATE INDEX idx_pengeluaran_operasional_tanggal ON public.pengeluaran_operasional(tanggal);
 CREATE INDEX idx_cash_flow_tanggal ON public.cash_flow(tanggal);
 CREATE INDEX idx_cash_flow_source ON public.cash_flow(source_type, source_id);
+CREATE INDEX idx_cash_flow_kontrak_hauling ON public.cash_flow(kontrak_hauling_id);
 
 
 -- =========================================================================
@@ -546,27 +547,31 @@ CREATE OR REPLACE FUNCTION public.sync_bbm_to_cash_flow()
 RETURNS TRIGGER AS $$
 DECLARE
     unit_code TEXT;
+    rand_kontrak UUID;
     cf_id UUID;
 BEGIN
-    SELECT kode_unit INTO unit_code FROM public.unit WHERE id = NEW.unit_id;
+    SELECT kode_unit, kontrak_hauling_id INTO unit_code, rand_kontrak FROM public.unit WHERE id = NEW.unit_id;
     SELECT id INTO cf_id FROM public.cash_flow WHERE source_type = 'BBM' AND source_id = NEW.id;
     
     IF cf_id IS NULL THEN
-        INSERT INTO public.cash_flow (tanggal, jenis, kategori, nominal, keterangan, source_type, source_id)
+        INSERT INTO public.cash_flow (tanggal, jenis, kategori, nominal, keterangan, source_type, source_id, kontrak_hauling_id)
         VALUES (
             NEW.tanggal,
             'Pengeluaran',
-            'BBM',
+            'BBM Armada',
             NEW.total_biaya,
             'Pembelian BBM Solar Unit ' || COALESCE(unit_code, '') || ' @' || NEW.lokasi_pengisian,
             'BBM',
-            NEW.id
+            NEW.id,
+            rand_kontrak
         );
     ELSE
         UPDATE public.cash_flow SET
             tanggal = NEW.tanggal,
             nominal = NEW.total_biaya,
-            keterangan = 'Pembelian BBM Solar Unit ' || COALESCE(unit_code, '') || ' @' || NEW.lokasi_pengisian
+            kategori = 'BBM Armada',
+            keterangan = 'Pembelian BBM Solar Unit ' || COALESCE(unit_code, '') || ' @' || NEW.lokasi_pengisian,
+            kontrak_hauling_id = rand_kontrak
         WHERE id = cf_id;
     END IF;
     RETURN NEW;
@@ -595,31 +600,35 @@ CREATE OR REPLACE FUNCTION public.sync_payroll_to_cash_flow()
 RETURNS TRIGGER AS $$
 DECLARE
     driver_name TEXT;
+    rand_kontrak UUID;
     cf_id UUID;
     payment_date DATE;
 BEGIN
-    SELECT nama INTO driver_name FROM public.driver WHERE id = NEW.driver_id;
+    SELECT nama, kontrak_hauling_id INTO driver_name, rand_kontrak FROM public.driver WHERE id = NEW.driver_id;
     SELECT id INTO cf_id FROM public.cash_flow WHERE source_type = 'Payroll' AND source_id = NEW.id;
     
     payment_date := COALESCE(NEW.updated_at::date, NOW()::date);
 
     IF NEW.status = 'Paid' THEN
         IF cf_id IS NULL THEN
-            INSERT INTO public.cash_flow (tanggal, jenis, kategori, nominal, keterangan, source_type, source_id)
+            INSERT INTO public.cash_flow (tanggal, jenis, kategori, nominal, keterangan, source_type, source_id, kontrak_hauling_id)
             VALUES (
                 payment_date,
                 'Pengeluaran',
-                'Gaji Driver',
+                'Gaji',
                 NEW.total_gaji,
                 'Gaji Driver: ' || COALESCE(driver_name, '') || ' Periode ' || NEW.bulan || '/' || NEW.tahun,
                 'Payroll',
-                NEW.id
+                NEW.id,
+                rand_kontrak
             );
         ELSE
             UPDATE public.cash_flow SET
                 tanggal = payment_date,
                 nominal = NEW.total_gaji,
-                keterangan = 'Gaji Driver: ' || COALESCE(driver_name, '') || ' Periode ' || NEW.bulan || '/' || NEW.tahun
+                kategori = 'Gaji',
+                keterangan = 'Gaji Driver: ' || COALESCE(driver_name, '') || ' Periode ' || NEW.bulan || '/' || NEW.tahun,
+                kontrak_hauling_id = rand_kontrak
             WHERE id = cf_id;
         END IF;
     ELSE
@@ -711,21 +720,24 @@ BEGIN
 
     IF NEW.status = 'Paid' THEN
         IF cf_id IS NULL THEN
-            INSERT INTO public.cash_flow (tanggal, jenis, kategori, nominal, keterangan, source_type, source_id)
+            INSERT INTO public.cash_flow (tanggal, jenis, kategori, nominal, keterangan, source_type, source_id, kontrak_hauling_id)
             VALUES (
                 payment_date,
                 'Pemasukan',
-                'Invoice Customer',
+                'Pembayaran Invoice',
                 NEW.total_tagihan,
                 'Pembayaran Invoice No: ' || NEW.nomor_invoice || ' - Perusahaan: ' || COALESCE(company_name, '') || ' Periode ' || NEW.periode,
                 'Invoice',
-                NEW.id
+                NEW.id,
+                NEW.kontrak_hauling_id
             );
         ELSE
             UPDATE public.cash_flow SET
                 tanggal = payment_date,
                 nominal = NEW.total_tagihan,
-                keterangan = 'Pembayaran Invoice No: ' || NEW.nomor_invoice || ' - Perusahaan: ' || COALESCE(company_name, '') || ' Periode ' || NEW.periode
+                kategori = 'Pembayaran Invoice',
+                keterangan = 'Pembayaran Invoice No: ' || NEW.nomor_invoice || ' - Perusahaan: ' || COALESCE(company_name, '') || ' Periode ' || NEW.periode,
+                kontrak_hauling_id = NEW.kontrak_hauling_id
             WHERE id = cf_id;
         END IF;
     ELSE

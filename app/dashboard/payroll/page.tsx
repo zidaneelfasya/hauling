@@ -56,6 +56,7 @@ export default function PayrollPage() {
 
   // Form Fields
   const [driverId, setDriverId] = useState("");
+  const [tanggal, setTanggal] = useState("");
   const [bulan, setBulan] = useState(6);
   const [tahun, setTahun] = useState(2026);
   const [jumlahRitase, setJumlahRitase] = useState<string>("0");
@@ -147,8 +148,10 @@ export default function PayrollPage() {
   const openAddDialog = () => {
     setEditPay(null);
     setDriverId(drivers[0]?.id || "");
-    setBulan(6);
-    setTahun(2026);
+    const today = new Date();
+    setTanggal(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`);
+    setBulan(today.getMonth() + 1);
+    setTahun(today.getFullYear());
     setJumlahRitase("0");
     setTarifPerRitase("50000");
     setBonus("0");
@@ -160,6 +163,7 @@ export default function PayrollPage() {
   const openEditDialog = (p: any) => {
     setEditPay(p);
     setDriverId(p.driver_id);
+    setTanggal(p.tanggal || "");
     setBulan(p.bulan);
     setTahun(p.tahun);
     setJumlahRitase(String(p.jumlah_ritase || 0));
@@ -205,6 +209,7 @@ export default function PayrollPage() {
 
     const payload = {
       driver_id: driverId,
+      tanggal,
       bulan: Number(bulan),
       tahun: Number(tahun),
       jumlah_ritase: Number(jumlahRitase),
@@ -335,6 +340,7 @@ export default function PayrollPage() {
               <TableRow>
                 <TableHead className="text-xs">Driver</TableHead>
                 <TableHead className="text-xs">NIK</TableHead>
+                <TableHead className="text-xs">Tanggal</TableHead>
                 <TableHead className="text-xs">Periode</TableHead>
                 <TableHead className="text-xs text-right">Banyaknya Ritase</TableHead>
                 <TableHead className="text-xs text-right">Tarif / Ritase</TableHead>
@@ -356,6 +362,7 @@ export default function PayrollPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-xs font-mono">{p.driver?.nik}</TableCell>
+                  <TableCell className="text-xs font-mono">{p.tanggal || "-"}</TableCell>
                   <TableCell className="text-xs font-semibold">{getMonthName(p.bulan)} {p.tahun}</TableCell>
                   <TableCell className="text-xs text-right font-medium">{p.jumlah_ritase} Rit</TableCell>
                   <TableCell className="text-xs text-right font-medium">{formatCurrency(Number(p.tarif_per_ritase))}</TableCell>
@@ -389,7 +396,7 @@ export default function PayrollPage() {
               ))}
               {filteredPayrolls.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={isManager ? 9 : 8} className="text-center py-10 text-xs text-muted-foreground">
+                  <TableCell colSpan={isManager ? 10 : 9} className="text-center py-10 text-xs text-muted-foreground">
                     Tidak ada slip gaji driver dalam periode terpilih.
                   </TableCell>
                 </TableRow>
@@ -466,6 +473,17 @@ export default function PayrollPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Tanggal Pembayaran</label>
+              <Input
+                type="date"
+                value={tanggal}
+                onChange={(e) => setTanggal(e.target.value)}
+                className="text-xs h-9"
+                required
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

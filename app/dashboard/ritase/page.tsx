@@ -8,14 +8,16 @@ import {
   createRitase,
   updateRitase,
   deleteRitase,
+  deleteMultipleRitase,
   approveRitase,
   rejectRitase
 } from "@/app/actions/ritase";
-import { getUnits } from "@/app/actions/unit";
 import { getDrivers } from "@/app/actions/driver";
+import { getUnits } from "@/app/actions/unit";
 import { getLokasiLoading, getLokasiDumping, getKontrakHauling } from "@/app/actions/master";
 import { toast } from "@/hooks/use-toast";
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableHeader,
@@ -61,7 +63,8 @@ export default function RitasePage() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [selectedRitaseDetail, setSelectedRitaseDetail] = useState<any | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Form Fields
   const [tanggal, setTanggal] = useState("");
@@ -183,10 +186,24 @@ export default function RitasePage() {
     mutationFn: deleteRitase,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ritase"] });
+      // If we deleted the item, remove it from selection if present
+      setSelectedIds((prev) => prev.filter((id) => !deleteIds?.includes(id)));
       toast({ title: "Sukses", description: "Catatan ritase berhasil dihapus", type: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Gagal", description: err.message || "Gagal menghapus ritase", type: "error" });
+    }
+  });
+
+  const deleteMultipleMutation = useMutation({
+    mutationFn: deleteMultipleRitase,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ritase"] });
+      setSelectedIds([]); // Clear all selections
+      toast({ title: "Sukses", description: "Beberapa catatan ritase berhasil dihapus", type: "success" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Gagal", description: err.message || "Gagal menghapus beberapa ritase", type: "error" });
     }
   });
 
@@ -292,7 +309,7 @@ export default function RitasePage() {
   };
 
   const handleDelete = (id: string) => {
-    setDeleteId(id);
+    setDeleteIds([id]);
   };
 
   const triggerApprove = (id: string) => {
@@ -419,6 +436,29 @@ export default function RitasePage() {
           <Table>
             <TableHeader>
               <TableRow>
+                {isManager && (
+                  <TableHead className="w-[40px] text-xs">
+                    <Checkbox
+                      checked={
+                        paginatedList.length > 0 &&
+                        paginatedList.every((r) => selectedIds.includes(r.id))
+                          ? true
+                          : paginatedList.some((r) => selectedIds.includes(r.id))
+                          ? "indeterminate"
+                          : false
+                      }
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          const pageIds = paginatedList.map((r) => r.id);
+                          setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+                        } else {
+                          const pageIds = paginatedList.map((r) => r.id);
+                          setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+                        }
+                      }}
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="text-xs">Tanggal</TableHead>
                 <TableHead className="text-xs">Kontrak</TableHead>
                 <TableHead className="text-xs">Unit DT</TableHead>
@@ -447,6 +487,20 @@ export default function RitasePage() {
                     className="hover:bg-muted/30 cursor-pointer"
                     onClick={() => setSelectedRitaseDetail(r)}
                   >
+                    {isManager && (
+                      <TableCell className="text-xs w-[40px]" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.includes(r.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedIds((prev) => [...prev, r.id]);
+                            } else {
+                              setSelectedIds((prev) => prev.filter((id) => id !== r.id));
+                            }
+                          }}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="text-xs font-mono">{r.tanggal}</TableCell>
                     <TableCell className="text-xs">
                       <div className="font-bold text-foreground">{r.kontrak_hauling?.kode_kontrak}</div>
@@ -568,7 +622,7 @@ export default function RitasePage() {
               })}
               {filteredList.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-10 text-xs text-muted-foreground">
+                  <TableCell colSpan={isManager ? 12 : 11} className="text-center py-10 text-xs text-muted-foreground">
                     Tidak ada log ritase yang sesuai.
                   </TableCell>
                 </TableRow>
@@ -1174,17 +1228,53 @@ export default function RitasePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Floating Action Bar for Bulk Actions */}
+      {isManager && selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-background/95 border shadow-xl rounded-full px-4 py-2.5 flex items-center gap-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <span className="text-xs font-semibold text-muted-foreground">
+            {selectedIds.length} item terpilih
+          </span>
+          <div className="h-4 w-px bg-border" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds([])}
+            className="text-xs h-8 px-3 rounded-full hover:bg-muted"
+          >
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteIds(selectedIds)}
+            className="text-xs h-8 px-3 rounded-full gap-1.5 bg-rose-500 hover:bg-rose-600 text-white"
+          >
+            <Trash2 size={13} />
+            Hapus Terpilih
+          </Button>
+        </div>
+      )}
+
       <DeleteConfirmDialog
-        isOpen={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
+        isOpen={!!deleteIds && deleteIds.length > 0}
+        onOpenChange={(open) => !open && setDeleteIds(null)}
         onConfirm={() => {
-          if (deleteId) {
-            deleteMutation.mutate(deleteId);
-            setDeleteId(null);
+          if (deleteIds) {
+            if (deleteIds.length === 1) {
+              deleteMutation.mutate(deleteIds[0]);
+            } else {
+              deleteMultipleMutation.mutate(deleteIds);
+            }
+            setDeleteIds(null);
           }
         }}
-        title="Hapus Catatan Ritase"
-        description="Apakah Anda yakin ingin menghapus catatan ritase ini? Tindakan ini tidak dapat dibatalkan."
+        isLoading={deleteMutation.isPending || deleteMultipleMutation.isPending}
+        title={deleteIds && deleteIds.length > 1 ? "Hapus Beberapa Catatan Ritase" : "Hapus Catatan Ritase"}
+        description={
+          deleteIds && deleteIds.length > 1
+            ? `Apakah Anda yakin ingin menghapus ${deleteIds.length} catatan ritase yang dipilih? Tindakan ini tidak dapat dibatalkan.`
+            : "Apakah Anda yakin ingin menghapus catatan ritase ini? Tindakan ini tidak dapat dibatalkan."
+        }
       />
     </div>
   );

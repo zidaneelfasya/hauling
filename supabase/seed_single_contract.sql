@@ -5,8 +5,8 @@
 TRUNCATE public.cash_flow, public.invoice, public.payroll, public.maintenance, public.bbm, public.ritase, public.driver, public.unit, public.kontrak_hauling, public.lokasi_loading, public.lokasi_dumping CASCADE;
 
 -- 1. Seed Single Contract
-INSERT INTO public.kontrak_hauling (id, kode_kontrak, perusahaan, tanggal_mulai, tanggal_selesai, jumlah_unit, status) VALUES
-('a0000000-0000-0000-0000-000000000001', 'HK-2026-001', 'PT Vale Indonesia Tbk', '2026-01-01', '2026-12-31', 5, 'Aktif');
+INSERT INTO public.kontrak_hauling (id, kode_kontrak, perusahaan, tanggal_mulai, tanggal_selesai, status) VALUES
+('a0000000-0000-0000-0000-000000000001', 'HK-2026-001', 'PT Vale Indonesia Tbk', '2026-01-01', '2026-12-31', 'Aktif');
 
 -- 2. Seed Locations
 INSERT INTO public.lokasi_loading (id, nama_lokasi) VALUES

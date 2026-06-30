@@ -28,7 +28,10 @@ export async function getKontrakHauling() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("kontrak_hauling")
-    .select("*")
+    .select(`
+      *,
+      unit (id)
+    `)
     .order("kode_kontrak", { ascending: true });
   if (error) throw error;
   return data;
@@ -39,7 +42,6 @@ export async function createKontrakHauling(formData: {
   perusahaan: string;
   tanggal_mulai: string;
   tanggal_selesai: string;
-  jumlah_unit: number;
   status: string;
 }) {
   await verifyManagerRole();
@@ -66,7 +68,6 @@ export async function updateKontrakHauling(id: string, formData: {
   perusahaan: string;
   tanggal_mulai: string;
   tanggal_selesai: string;
-  jumlah_unit: number;
   status: string;
 }) {
   await verifyManagerRole();

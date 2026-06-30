@@ -85,6 +85,7 @@ export async function calculateDriverIncentive(driverId: string, bulan: number, 
 
 export async function createPayroll(formData: {
   driver_id: string;
+  tanggal: string;
   bulan: number;
   tahun: number;
   jumlah_ritase: number;
@@ -120,6 +121,7 @@ export async function updatePayroll(
   id: string,
   formData: {
     driver_id: string;
+    tanggal: string;
     bulan: number;
     tahun: number;
     jumlah_ritase: number;

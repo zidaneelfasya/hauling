@@ -88,7 +88,6 @@ export default function MasterDataPage() {
   const [perusahaan, setPerusahaan] = useState("");
   const [tanggalMulai, setTanggalMulai] = useState("");
   const [tanggalSelesai, setTanggalSelesai] = useState("");
-  const [jumlahUnit, setJumlahUnit] = useState(0);
   const [statusKontrak, setStatusKontrak] = useState("Aktif");
 
   // Form fields for Locations
@@ -225,7 +224,6 @@ export default function MasterDataPage() {
     setPerusahaan("");
     setTanggalMulai("");
     setTanggalSelesai("");
-    setJumlahUnit(0);
     setStatusKontrak("Aktif");
     setIsCustOpen(true);
   };
@@ -236,7 +234,6 @@ export default function MasterDataPage() {
     setPerusahaan(k.perusahaan);
     setTanggalMulai(k.tanggal_mulai);
     setTanggalSelesai(k.tanggal_selesai);
-    setJumlahUnit(Number(k.jumlah_unit));
     setStatusKontrak(k.status);
     setIsCustOpen(true);
   };
@@ -268,7 +265,7 @@ export default function MasterDataPage() {
   // Submit Handlers
   const handleCustSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!kodeKontrak || !perusahaan || !tanggalMulai || !tanggalSelesai || !jumlahUnit || !statusKontrak) {
+    if (!kodeKontrak || !perusahaan || !tanggalMulai || !tanggalSelesai || !statusKontrak) {
       toast({ title: "Peringatan", description: "Semua kolom wajib diisi", type: "warning" });
       return;
     }
@@ -277,7 +274,6 @@ export default function MasterDataPage() {
       perusahaan,
       tanggal_mulai: tanggalMulai,
       tanggal_selesai: tanggalSelesai,
-      jumlah_unit: Number(jumlahUnit),
       status: statusKontrak,
     };
     if (editCust) {
@@ -439,7 +435,7 @@ export default function MasterDataPage() {
                         <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5 font-semibold">Jumlah Unit Ditugaskan</div>
                         <div className="font-extrabold text-orange-500 text-xs flex items-center gap-1 leading-none">
                           <Truck size={13} className="shrink-0 text-orange-500" />
-                          {k.jumlah_unit} Unit Dump Truck
+                          {k.unit?.length || 0} Unit Dump Truck
                         </div>
                       </div>
                     </div>
@@ -602,24 +598,18 @@ export default function MasterDataPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase">Jumlah Unit DT</label>
-                <Input type="number" placeholder="5" value={jumlahUnit || ""} onChange={(e) => setJumlahUnit(Number(e.target.value))} className="text-xs h-9" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase">Status Kontrak</label>
-                <Select value={statusKontrak} onValueChange={setStatusKontrak}>
-                  <SelectTrigger className="text-xs h-9 bg-card">
-                    <SelectValue placeholder="Pilih Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Aktif">Aktif</SelectItem>
-                    <SelectItem value="Selesai">Selesai</SelectItem>
-                    <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Status Kontrak</label>
+              <Select value={statusKontrak} onValueChange={setStatusKontrak}>
+                <SelectTrigger className="text-xs h-9 bg-card">
+                  <SelectValue placeholder="Pilih Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Aktif">Aktif</SelectItem>
+                  <SelectItem value="Selesai">Selesai</SelectItem>
+                  <SelectItem value="Nonaktif">Nonaktif</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <DialogFooter className="pt-2">

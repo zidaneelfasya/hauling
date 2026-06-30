@@ -61,8 +61,8 @@ const navItems: NavItem[] = [
     roles: ["Owner", "Full Access", "Admin", "Supervisor", "Driver"],
   },
   {
-    title: "Financial Report",
-    href: "/dashboard/financial-report",
+    title: "Transaksi",
+    href: "/dashboard/financial",
     icon: Wallet,
     roles: ["Owner", "Full Access", "Admin"],
   },
@@ -82,12 +82,6 @@ const navItems: NavItem[] = [
     title: "Ritase Tambang",
     href: "/dashboard/ritase",
     icon: FileText,
-    roles: ["Owner", "Full Access", "Admin", "Supervisor", "Driver"],
-  },
-  {
-    title: "Log BBM",
-    href: "/dashboard/bbm",
-    icon: Fuel,
     roles: ["Owner", "Full Access", "Admin", "Supervisor", "Driver"],
   },
   {

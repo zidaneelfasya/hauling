@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
-  getFinancialReportData,
+  getTransactionsData,
   createCashFlow,
   updateCashFlow,
   deleteCashFlow,
@@ -50,68 +50,86 @@ import {
   Edit2,
   Trash2,
   Loader2,
-  TrendingUp,
-  TrendingDown,
-  CircleDollarSign,
-  Calendar,
-  Fuel,
-  Users,
-  Wrench,
   ArrowUpRight,
   ArrowDownLeft,
-  DollarSign,
+  Wallet,
+  Calendar,
   Briefcase,
-  HelpCircle,
+  FileText,
+  Clock,
+  Filter,
+  Check,
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
+
+// Kategori Standar sesuai permintaan
+const EXPENSE_CATEGORIES = [
+  "Gaji",
+  "Sewa Unit",
+  "BBM Operasional",
+  "BBM Armada",
+  "kantor",
+  "maintenance",
+  "Overhead",
+  "Transportasi",
+  "Akomodasi",
+  "Pajak",
+  "Lainnya",
+];
+
+const INCOME_CATEGORIES = [
+  "Pembayaran Invoice",
+  "DP Kontrak",
+  "Pelunasan",
+  "Pendapatan Lain",
+  "Dana Investor",
+  "Lainnya",
+];
 
 export function FinancialReportView() {
   const queryClient = useQueryClient();
 
-  // Date Filter State (defaults to current month)
-  const [startDate, setStartDate] = useState(() => {
+  // 1. Filter States
+  const [filterJenis, setFilterJenis] = useState<"ALL" | "Pemasukan" | "Pengeluaran">("ALL");
+  const [filterKategori, setFilterKategori] = useState<string>("ALL");
+  const [filterKontrak, setFilterKontrak] = useState<string>("ALL");
+  const [filterPeriode, setFilterPeriode] = useState<"TODAY" | "WEEK" | "MONTH" | "CUSTOM">("MONTH");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Custom Date Bounds (Only displayed when filterPeriode is CUSTOM)
+  const [customStartDate, setCustomStartDate] = useState(() => {
     const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().substring(0, 10);
+    const s = new Date(d.getFullYear(), d.getMonth(), 1);
+    return `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`;
   });
-  const [endDate, setEndDate] = useState(() => {
+  const [customEndDate, setCustomEndDate] = useState(() => {
     const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().substring(0, 10);
+    const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return `${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, "0")}-${String(e.getDate()).padStart(2, "0")}`;
   });
 
-  // Table Search and Pagination
-  const [searchTerm, setSearchTerm] = useState("");
+  // Table pagination
   const [currentIncomePage, setCurrentIncomePage] = useState(1);
   const [currentExpensePage, setCurrentExpensePage] = useState(1);
   const itemsPerPage = 10;
 
-  // Session user state
+  // Session user profile state
   const [userProfile, setUserProfile] = useState<any>(null);
 
-  // Dialog State
+  // Modal / Dialog States
   const [isOpen, setIsOpen] = useState(false);
   const [editTx, setEditTx] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selectedDetailTx, setSelectedDetailTx] = useState<any | null>(null);
 
   // Form Fields
   const [tanggal, setTanggal] = useState("");
   const [jenis, setJenis] = useState<"Pemasukan" | "Pengeluaran">("Pengeluaran");
   const [kategori, setKategori] = useState("");
   const [nominal, setNominal] = useState<string>("0");
+  const [kontrakHaulingId, setKontrakHaulingId] = useState<string>("none");
   const [keterangan, setKeterangan] = useState("");
 
-  // Fetch session profile on load
+  // Fetch user session on load
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -131,79 +149,82 @@ export function FinancialReportView() {
   const isWriteAllowed =
     userProfile && ["Owner", "Full Access", "Admin"].includes(userProfile.role);
 
-  // Query Financial Report Data
-  const { data: report, isLoading } = useQuery({
-    queryKey: ["financial-report", startDate, endDate],
-    queryFn: () => getFinancialReportData(startDate, endDate),
+  // Fetch database transactions
+  const { data, isLoading } = useQuery({
+    queryKey: ["transactions-data"],
+    queryFn: getTransactionsData,
   });
+
+  const { cashFlows = [], contracts = [], totalRunningBalance = 0 } = data || {};
+
+  // Reset category filter if selected type changes
+  useEffect(() => {
+    setFilterKategori("ALL");
+  }, [filterJenis]);
+
+  // Dynamic Categories list for Filter dropdown
+  const filteredCategoriesList = useMemo(() => {
+    if (filterJenis === "Pemasukan") return INCOME_CATEGORIES;
+    if (filterJenis === "Pengeluaran") return EXPENSE_CATEGORIES;
+    return Array.from(new Set([...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES]));
+  }, [filterJenis]);
+
+  // Dynamic Categories list for Form dialog depending on Form's selected Jenis
+  const formCategoriesList = useMemo(() => {
+    return jenis === "Pemasukan" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  }, [jenis]);
+
+  // Set default category when form transaction type changes
+  useEffect(() => {
+    if (formCategoriesList.length > 0 && !formCategoriesList.includes(kategori)) {
+      setKategori(formCategoriesList[0]);
+    }
+  }, [jenis, formCategoriesList]);
 
   // Mutations
   const createMutation = useMutation({
     mutationFn: createCashFlow,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["financial-report"] });
-      toast({
-        title: "Sukses",
-        description: "Transaksi manual berhasil dicatat",
-        type: "success",
-      });
+      queryClient.invalidateQueries({ queryKey: ["transactions-data"] });
+      toast({ title: "Sukses", description: "Transaksi manual berhasil dicatat", type: "success" });
       closeDialog();
     },
     onError: (err: any) => {
-      toast({
-        title: "Gagal",
-        description: err.message || "Gagal mencatat transaksi",
-        type: "error",
-      });
+      toast({ title: "Gagal", description: err.message || "Gagal mencatat transaksi", type: "error" });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => updateCashFlow(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["financial-report"] });
-      toast({
-        title: "Sukses",
-        description: "Transaksi manual berhasil diubah",
-        type: "success",
-      });
+      queryClient.invalidateQueries({ queryKey: ["transactions-data"] });
+      toast({ title: "Sukses", description: "Transaksi manual berhasil diubah", type: "success" });
       closeDialog();
     },
     onError: (err: any) => {
-      toast({
-        title: "Gagal",
-        description: err.message || "Gagal mengubah transaksi",
-        type: "error",
-      });
+      toast({ title: "Gagal", description: err.message || "Gagal mengubah transaksi", type: "error" });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteCashFlow,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["financial-report"] });
-      toast({
-        title: "Sukses",
-        description: "Transaksi manual berhasil dihapus",
-        type: "success",
-      });
+      queryClient.invalidateQueries({ queryKey: ["transactions-data"] });
+      toast({ title: "Sukses", description: "Transaksi manual berhasil dihapus", type: "success" });
     },
     onError: (err: any) => {
-      toast({
-        title: "Gagal",
-        description: err.message || "Gagal menghapus transaksi",
-        type: "error",
-      });
+      toast({ title: "Gagal", description: err.message || "Gagal menghapus transaksi", type: "error" });
     },
   });
 
-  // Modal actions
+  // Modal handlers
   const openAddDialog = () => {
     setEditTx(null);
     setTanggal(new Date().toISOString().substring(0, 10));
     setJenis("Pengeluaran");
-    setKategori("");
+    setKategori(EXPENSE_CATEGORIES[0]);
     setNominal("0");
+    setKontrakHaulingId("none");
     setKeterangan("");
     setIsOpen(true);
   };
@@ -214,6 +235,7 @@ export function FinancialReportView() {
     setJenis(tx.jenis);
     setKategori(tx.kategori);
     setNominal(String(tx.nominal));
+    setKontrakHaulingId(tx.kontrak_hauling_id || "none");
     setKeterangan(tx.keterangan || "");
     setIsOpen(true);
   };
@@ -225,11 +247,7 @@ export function FinancialReportView() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tanggal || !kategori || Number(nominal) <= 0) {
-      toast({
-        title: "Peringatan",
-        description: "Semua kolom wajib diisi dan nominal harus lebih dari 0",
-        type: "warning",
-      });
+      toast({ title: "Peringatan", description: "Semua kolom wajib diisi dan nominal harus lebih dari 0", type: "warning" });
       return;
     }
 
@@ -238,7 +256,8 @@ export function FinancialReportView() {
       jenis,
       kategori,
       nominal: Number(nominal),
-      keterangan,
+      keterangan: keterangan || undefined,
+      kontrak_hauling_id: kontrakHaulingId === "none" ? null : kontrakHaulingId,
     };
 
     if (editTx) {
@@ -252,29 +271,79 @@ export function FinancialReportView() {
     setDeleteId(id);
   };
 
-  // UI calculations & charts preparation
+  // Helper currency formatters
   const formatCurrency = (val: number) => {
-    return `Rp${Number(val || 0).toLocaleString("id-ID")}`;
+    return "Rp" + Math.round(val).toLocaleString("id-ID");
   };
 
-  const filteredTransactions = useMemo(() => {
-    const list = report?.cashFlowBlock?.transactions || [];
-    const sorted = [...list].sort((a: any, b: any) => {
-      const dateA = new Date(a.tanggal).getTime();
-      const dateB = new Date(b.tanggal).getTime();
-      if (dateA !== dateB) return dateB - dateA;
-      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-    });
-    return sorted.filter((tx: any) => {
-      const matchSearch =
-        tx.kategori.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (tx.keterangan || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.source_type.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchSearch;
-    });
-  }, [report, searchTerm]);
 
-  // Separate Income and Expense
+  // Helper: format Date to YYYY-MM-DD in local timezone (avoids UTC shift from toISOString)
+  const toLocalDateStr = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // 2. Client-Side Filtration Logic
+  const filteredTransactions = useMemo(() => {
+    // A. Period Calculation
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = toLocalDateStr(today);
+
+    // Compute week start (Monday) and end (Sunday)
+    const currentDay = today.getDay();
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const startOfWeek = new Date(today.getTime() + distanceToMonday * 24 * 60 * 60 * 1000);
+    const endOfWeek = new Date(startOfWeek.getTime() + 6 * 24 * 60 * 60 * 1000);
+    const startOfWeekStr = toLocalDateStr(startOfWeek);
+    const endOfWeekStr = toLocalDateStr(endOfWeek);
+
+    // Compute month start and end
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const startOfMonthStr = toLocalDateStr(startOfMonth);
+    const endOfMonthStr = toLocalDateStr(endOfMonth);
+
+    return cashFlows.filter((tx: any) => {
+      // Periode filter
+      if (filterPeriode === "TODAY") {
+        if (tx.tanggal !== todayStr) return false;
+      } else if (filterPeriode === "WEEK") {
+        if (tx.tanggal < startOfWeekStr || tx.tanggal > endOfWeekStr) return false;
+      } else if (filterPeriode === "MONTH") {
+        if (tx.tanggal < startOfMonthStr || tx.tanggal > endOfMonthStr) return false;
+      } else if (filterPeriode === "CUSTOM") {
+        if (tx.tanggal < customStartDate || tx.tanggal > customEndDate) return false;
+      }
+
+      // Jenis filter
+      if (filterJenis !== "ALL" && tx.jenis !== filterJenis) return false;
+
+      // Kategori filter
+      if (filterKategori !== "ALL" && tx.kategori !== filterKategori) return false;
+
+      // Kontrak filter
+      if (filterKontrak !== "ALL") {
+        if (tx.kontrak_hauling_id !== filterKontrak) return false;
+      }
+
+      // Search term (Cari)
+      if (searchTerm) {
+        const query = searchTerm.toLowerCase();
+        const categoryMatch = tx.kategori.toLowerCase().includes(query);
+        const descMatch = (tx.keterangan || "").toLowerCase().includes(query);
+        const contractMatch = tx.kontrak_hauling?.kode_kontrak?.toLowerCase().includes(query) ||
+                              tx.kontrak_hauling?.perusahaan?.toLowerCase().includes(query);
+        if (!categoryMatch && !descMatch && !contractMatch) return false;
+      }
+
+      return true;
+    });
+  }, [cashFlows, filterPeriode, filterJenis, filterKategori, filterKontrak, customStartDate, customEndDate, searchTerm]);
+
+  // Split into Income and Expense Lists
   const incomeTransactions = useMemo(() => {
     return filteredTransactions.filter((tx: any) => tx.jenis === "Pemasukan");
   }, [filteredTransactions]);
@@ -283,397 +352,287 @@ export function FinancialReportView() {
     return filteredTransactions.filter((tx: any) => tx.jenis === "Pengeluaran");
   }, [filteredTransactions]);
 
-  // Pagination for Income
-  const totalIncomePages = Math.ceil(incomeTransactions.length / itemsPerPage);
-  const paginatedIncomeTransactions = useMemo(() => {
+  // Paginated lists
+  const paginatedIncome = useMemo(() => {
     const start = (currentIncomePage - 1) * itemsPerPage;
     return incomeTransactions.slice(start, start + itemsPerPage);
   }, [incomeTransactions, currentIncomePage]);
 
-  // Pagination for Expense
-  const totalExpensePages = Math.ceil(expenseTransactions.length / itemsPerPage);
-  const paginatedExpenseTransactions = useMemo(() => {
+  const paginatedExpense = useMemo(() => {
     const start = (currentExpensePage - 1) * itemsPerPage;
     return expenseTransactions.slice(start, start + itemsPerPage);
   }, [expenseTransactions, currentExpensePage]);
 
-  // Recharts Chart Data Preparations
-  const barChartData = useMemo(() => {
-    if (!report) return [];
-    return [
-      {
-        name: "Accrual (Kinerja)",
-        Revenue: report.revenueBlock.revenue,
-        HPP: report.hppBlock.totalHpp,
-        Profit: report.profitBlock.netProfit,
-      },
-      {
-        name: "Kas Riil (Cash Flow)",
-        Revenue: report.cashFlowBlock.cashIn,
-        HPP: report.cashFlowBlock.cashOut,
-        Profit: report.cashFlowBlock.netCashFlow,
-      },
-    ];
-  }, [report]);
+  const totalIncomePages = Math.ceil(incomeTransactions.length / itemsPerPage);
+  const totalExpensePages = Math.ceil(expenseTransactions.length / itemsPerPage);
 
-  // Expenses breakdown for Pie Chart
-  const expensePieData = useMemo(() => {
-    if (!report) return [];
-    const breakdown: { [key: string]: number } = {};
+  // 3. Compute Metrics based on today's local date
+  const todaySummary = useMemo(() => {
+    const today = toLocalDateStr(new Date());
+    let cashInToday = 0;
+    let cashOutToday = 0;
 
-    report.cashFlowBlock.transactions.forEach((tx: any) => {
-      if (tx.jenis === "Pengeluaran") {
-        breakdown[tx.kategori] = (breakdown[tx.kategori] || 0) + Number(tx.nominal);
+    cashFlows.forEach((tx: any) => {
+      if (tx.tanggal === today) {
+        if (tx.jenis === "Pemasukan") {
+          cashInToday += Number(tx.nominal || 0);
+        } else {
+          cashOutToday += Number(tx.nominal || 0);
+        }
       }
     });
 
-    return Object.entries(breakdown).map(([name, value]) => ({
-      name,
-      value,
-    }));
-  }, [report]);
-
-  const COLORS = ["#f57c00", "#d32f2f", "#1976d2", "#388e3c", "#7b1fa2", "#e64a19", "#0097a7"];
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-40">
-        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
-      </div>
-    );
-  }
-
-  const { revenueBlock, hppBlock, cashFlowBlock, profitBlock } = report || {
-    revenueBlock: { totalRitase: 0, totalTonase: 0, revenue: 0 },
-    hppBlock: { fuelHpp: 0, driverSalaryHpp: 0, maintenanceHpp: 0, totalHpp: 0 },
-    cashFlowBlock: { cashIn: 0, cashOut: 0, netCashFlow: 0, transactions: [] },
-    profitBlock: { grossProfit: 0, netProfit: 0 },
-  };
+    return {
+      cashInToday,
+      cashOutToday,
+      netCashFlowToday: cashInToday - cashOutToday,
+    };
+  }, [cashFlows]);
 
   return (
     <div className="space-y-6 select-none animate-in fade-in duration-300">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Financial Report</h1>
-          <p className="text-xs text-muted-foreground">
-            Laporan Kinerja Keuangan: Rekap Omset, HPP, Cash Flow, dan Profitabilitas
-          </p>
-        </div>
+      
+      {/* ────────────────────────────────────────────────────────
+          AREA 1: FINANCIAL SUMMARY
+         ──────────────────────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        
+        {/* KPI 1: Saldo Kas Total */}
+        <Card className="border border-blue-500/25 rounded-2xl bg-blue-500/[0.02] dark:bg-blue-950/[0.05] shadow-md hover:shadow-lg transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 space-y-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Saldo Kas</span>
+            <Wallet className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className="text-lg sm:text-xl font-black text-blue-600 dark:text-blue-400 leading-tight truncate">
+              {formatCurrency(totalRunningBalance)}
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Date Filter & Add Button */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center border rounded-lg bg-card px-2.5 py-1.5 gap-2 text-xs">
-            <Calendar size={14} className="text-muted-foreground" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setCurrentIncomePage(1);
-                setCurrentExpensePage(1);
-              }}
-              className="bg-transparent border-none outline-none text-foreground font-semibold w-28"
-            />
-            <span className="text-muted-foreground font-medium">s/d</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setCurrentIncomePage(1);
-                setCurrentExpensePage(1);
-              }}
-              className="bg-transparent border-none outline-none text-foreground font-semibold w-28"
-            />
+        {/* KPI 2: Cash In Hari Ini */}
+        <Card className="border rounded-2xl bg-card shadow-sm hover:shadow-md transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 space-y-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cash In Hari Ini</span>
+            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 leading-tight truncate">
+              {formatCurrency(todaySummary.cashInToday)}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPI 3: Cash Out Hari Ini */}
+        <Card className="border rounded-2xl bg-card shadow-sm hover:shadow-md transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 space-y-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cash Out Hari Ini</span>
+            <ArrowDownLeft className="h-4 w-4 text-rose-500" />
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className="text-lg sm:text-xl font-black text-rose-600 dark:text-rose-400 leading-tight truncate">
+              {formatCurrency(todaySummary.cashOutToday)}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPI 4: Net Cash Flow Hari Ini */}
+        <Card className="border rounded-2xl bg-card shadow-sm hover:shadow-md transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 space-y-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Net Cash Flow</span>
+            <Clock className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className={`text-lg sm:text-xl font-black leading-tight truncate ${todaySummary.netCashFlowToday >= 0 ? "text-emerald-500" : "text-rose-600"}`}>
+              {formatCurrency(todaySummary.netCashFlowToday)}
+            </div>
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* ────────────────────────────────────────────────────────
+          AREA 2: FILTERS
+         ──────────────────────────────────────────────────────── */}
+      <Card className="border rounded-2xl bg-card shadow-sm">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <Filter size={16} className="text-orange-500" /> Filter Ledger Transaksi
+            </CardTitle>
+            <CardDescription className="text-xs">Saring berdasarkan parameter operasional dan tanggal</CardDescription>
           </div>
           {isWriteAllowed && (
             <Button
               onClick={openAddDialog}
-              className="bg-orange-500 hover:bg-orange-600 text-white gap-2 text-xs h-9"
+              className="bg-orange-500 hover:bg-orange-600 text-white gap-2 text-xs h-9 px-4 rounded-xl"
             >
-              <Plus size={16} /> Catat Transaksi
+              <Plus size={15} /> Catat Transaksi
             </Button>
           )}
-        </div>
-      </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
+            
+            {/* Filter Jenis */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Jenis</label>
+              <Select value={filterJenis} onValueChange={(val: any) => { setFilterJenis(val); setCurrentIncomePage(1); setCurrentExpensePage(1); }}>
+                <SelectTrigger className="text-xs h-9 bg-card rounded-xl">
+                  <SelectValue placeholder="Pilih Jenis" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="ALL">Semua Jenis</SelectItem>
+                  <SelectItem value="Pemasukan">Pemasukan (+)</SelectItem>
+                  <SelectItem value="Pengeluaran">Pengeluaran (-)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-      {/* Grid: Four Blocks (Revenue, HPP, Cashflow, Profit) */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* Block 1: Revenue */}
-        <Card className="border bg-card shadow-sm hover:border-orange-500/20 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Revenue (Ritase)
-            </CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-black text-foreground">
-              {formatCurrency(revenueBlock.revenue)}
+            {/* Filter Kategori */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Kategori</label>
+              <Select value={filterKategori} onValueChange={(val) => { setFilterKategori(val); setCurrentIncomePage(1); setCurrentExpensePage(1); }}>
+                <SelectTrigger className="text-xs h-9 bg-card rounded-xl">
+                  <SelectValue placeholder="Pilih Kategori" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="ALL">Semua Kategori</SelectItem>
+                  {filteredCategoriesList.map((cat) => (
+                    <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
-              <p>Total Ritase: <span className="font-semibold text-foreground">{revenueBlock.totalRitase} Rit</span></p>
-              <p>Total Tonase: <span className="font-semibold text-foreground">{revenueBlock.totalTonase.toLocaleString("id-ID")} T</span></p>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Block 2: HPP */}
-        <Card className="border bg-card shadow-sm hover:border-orange-500/20 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              HPP (Biaya Langsung)
-            </CardTitle>
-            <ArrowDownLeft className="h-4 w-4 text-rose-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-black text-rose-600 dark:text-rose-400">
-              {formatCurrency(hppBlock.totalHpp)}
+            {/* Filter Kontrak */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Kontrak Kerja</label>
+              <Select value={filterKontrak} onValueChange={(val) => { setFilterKontrak(val); setCurrentIncomePage(1); setCurrentExpensePage(1); }}>
+                <SelectTrigger className="text-xs h-9 bg-card rounded-xl">
+                  <SelectValue placeholder="Pilih Kontrak" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="ALL">Semua Kontrak</SelectItem>
+                  {contracts.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                      {c.kode_kontrak} - {c.perusahaan}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-2 space-y-0.5 grid grid-cols-2 gap-x-2">
-              <p className="flex items-center gap-1"><Fuel size={10} className="text-orange-500" /> BBM: {formatCurrency(hppBlock.fuelHpp)}</p>
-              <p className="flex items-center gap-1"><Users size={10} className="text-blue-500" /> Gaji: {formatCurrency(hppBlock.driverSalaryHpp)}</p>
-              <p className="flex items-center gap-1 col-span-2"><Wrench size={10} className="text-rose-500" /> Maintenance: {formatCurrency(hppBlock.maintenanceHpp)}</p>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Block 3: Cash Flow */}
-        <Card className="border bg-card shadow-sm hover:border-orange-500/20 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Cash Flow Riil
-            </CardTitle>
-            <CircleDollarSign className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-xl font-black ${cashFlowBlock.netCashFlow >= 0 ? "text-emerald-500" : "text-rose-600"}`}>
-              {formatCurrency(cashFlowBlock.netCashFlow)}
+            {/* Filter Periode */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Periode</label>
+              <Select value={filterPeriode} onValueChange={(val: any) => { setFilterPeriode(val); setCurrentIncomePage(1); setCurrentExpensePage(1); }}>
+                <SelectTrigger className="text-xs h-9 bg-card rounded-xl">
+                  <SelectValue placeholder="Pilih Periode" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="TODAY">Hari Ini</SelectItem>
+                  <SelectItem value="WEEK">Minggu Ini</SelectItem>
+                  <SelectItem value="MONTH">Bulan Ini</SelectItem>
+                  <SelectItem value="CUSTOM">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
-              <p className="flex justify-between"><span>Pemasukan (Kas):</span> <span className="font-semibold text-emerald-500">{formatCurrency(cashFlowBlock.cashIn)}</span></p>
-              <p className="flex justify-between"><span>Pengeluaran (Kas):</span> <span className="font-semibold text-rose-500">{formatCurrency(cashFlowBlock.cashOut)}</span></p>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Block 4: Profit */}
-        <Card className="border bg-card shadow-sm hover:border-orange-500/20 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Profitabilitas (Accrual)
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-xl font-black ${profitBlock.netProfit >= 0 ? "text-emerald-500" : "text-rose-600"}`}>
-              {formatCurrency(profitBlock.netProfit)}
-            </div>
-            <div className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
-              <p className="flex justify-between"><span>Gross Profit:</span> <span className="font-semibold text-foreground">{formatCurrency(profitBlock.grossProfit)}</span></p>
-              <p className="flex justify-between">
-                <span>Net Margin %:</span> 
-                <span className={`font-semibold ${revenueBlock.revenue > 0 && profitBlock.netProfit >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  {revenueBlock.revenue > 0 ? `${((profitBlock.netProfit / revenueBlock.revenue) * 100).toFixed(1)}%` : "0%"}
-                </span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Visual Analytics Charts */}
-      <div className="grid gap-6 md:grid-cols-12">
-        {/* Left: Accrual vs Cash comparison */}
-        <div className="md:col-span-7 border rounded-xl p-5 bg-card shadow-sm">
-          <div>
-            <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">
-              Accrual (Kinerja) vs Kas Riil (Cash Flow)
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Perbandingan pendapatan ritase vs cash-in invoice, dan HPP ritase vs cash-out BBM/Payroll
-            </p>
-          </div>
-          <div className="h-[280px] mt-6">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barChartData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis dataKey="name" fontSize={11} stroke="currentColor" opacity={0.5} />
-                <YAxis fontSize={11} stroke="currentColor" opacity={0.5} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#1c1917",
-                    border: "1px solid #2e2a24",
-                    borderRadius: "8px",
-                  }}
-                  labelStyle={{ fontSize: "11px", fontWeight: "bold" }}
-                  itemStyle={{ fontSize: "11px" }}
+            {/* Pencarian (Cari) */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Cari Deskripsi</label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Keterangan, kode..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentIncomePage(1); setCurrentExpensePage(1); }}
+                  className="pl-8 text-xs h-9 rounded-xl"
                 />
-                <Legend verticalAlign="top" height={36} fontSize={11} />
-                <Bar dataKey="Revenue" fill="#10b981" name="Pendapatan / Cash In" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="HPP" fill="#f43f5e" name="HPP / Cash Out" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Profit" fill="#3b82f6" name="Profit / Bersih" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Right: Cash Expense Breakdown by Category */}
-        <div className="md:col-span-5 border rounded-xl p-5 bg-card shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">
-              Porsi Pengeluaran Kas (Cash Out)
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Proporsi penyaluran dana kas pengeluaran berdasarkan kategori
-            </p>
-          </div>
-
-          {expensePieData.length > 0 ? (
-            <div className="flex-1 flex flex-col sm:flex-row items-center gap-4 mt-4 justify-center">
-              <div className="w-[150px] h-[150px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={expensePieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={65}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {expensePieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        background: "#1c1917",
-                        border: "1px solid #2e2a24",
-                        borderRadius: "8px",
-                      }}
-                      itemStyle={{ fontSize: "11px" }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex-1 text-xs space-y-1.5 w-full max-w-[200px]">
-                {expensePieData.map((d, i) => {
-                  const pct = (d.value / cashFlowBlock.cashOut) * 100;
-                  return (
-                    <div key={d.name} className="flex items-center gap-2">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
-                      />
-                      <span className="font-semibold text-muted-foreground truncate w-24">
-                        {d.name}
-                      </span>
-                      <span className="font-bold text-foreground ml-auto">
-                        {pct.toFixed(0)}%
-                      </span>
-                    </div>
-                  );
-                })}
               </div>
             </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground py-10 italic">
-              Tidak ada data pengeluaran kas dalam periode ini.
+
+          </div>
+
+          {/* Conditional Date inputs for CUSTOM range */}
+          {filterPeriode === "CUSTOM" && (
+            <div className="flex items-center gap-3 p-3 bg-muted/20 border border-dashed rounded-xl max-w-md animate-in fade-in slide-in-from-top-1 duration-200">
+              <div className="flex-1 space-y-1">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Dari Tanggal</span>
+                <Input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => { setCustomStartDate(e.target.value); setCurrentIncomePage(1); setCurrentExpensePage(1); }}
+                  className="text-xs h-8 bg-card"
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Hingga Tanggal</span>
+                <Input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => { setCustomEndDate(e.target.value); setCurrentIncomePage(1); setCurrentExpensePage(1); }}
+                  className="text-xs h-8 bg-card"
+                />
+              </div>
             </div>
           )}
 
-          <div className="pt-3 border-t flex justify-between items-center text-xs font-bold text-foreground">
-            <span>TOTAL PENGELUARAN KAS:</span>
-            <span className="text-rose-500 font-extrabold text-sm">
-              {formatCurrency(cashFlowBlock.cashOut)}
-            </span>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Transaction Ledger Table */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">
-              Buku Kas & Transaksi (Ledger)
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Daftar pemasukan dan pengeluaran kas yang disinkronisasi maupun dicatat manual.
-            </p>
+      {/* ────────────────────────────────────────────────────────
+          AREA 3: LEDGER TABLES (Cash In / Cash Out Side-by-Side)
+         ──────────────────────────────────────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        
+        {/* LEFT COLUMN: Cash In (Pemasukan) */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1.5">
+              <ArrowUpRight size={14} /> Pemasukan Kas (Cash In)
+            </h4>
+            <Badge variant="outline" className="text-[10px] bg-emerald-500/5 text-emerald-600 border-emerald-500/10 font-bold">
+              Total: {formatCurrency(incomeTransactions.reduce((sum, tx) => sum + Number(tx.nominal), 0))}
+            </Badge>
           </div>
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Cari kategori, keterangan, sumber..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentIncomePage(1);
-                setCurrentExpensePage(1);
-              }}
-              className="pl-9 text-xs h-9 bg-card"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {/* Left Panel: Pemasukan Kas */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1.5">
-                <ArrowUpRight size={14} /> Pemasukan Kas (Cash In)
-              </h4>
-              <Badge variant="outline" className="text-[10px] bg-emerald-500/5 text-emerald-600 border-emerald-500/10 font-bold">
-                Total: {formatCurrency(cashFlowBlock.cashIn)}
-              </Badge>
-            </div>
-            <div className="border rounded-xl bg-card overflow-hidden shadow-sm">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs w-24">Tanggal</TableHead>
-                    <TableHead className="text-xs">Kategori</TableHead>
-                    <TableHead className="text-xs">Keterangan / Rincian</TableHead>
-                    <TableHead className="text-xs text-right">Nominal</TableHead>
-                    <TableHead className="text-xs">Sumber</TableHead>
-                    {isWriteAllowed && <TableHead className="text-xs text-right w-20">Aksi</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedIncomeTransactions.map((tx: any) => {
-                    const isManual = tx.source_type === "Manual";
-                    return (
-                      <TableRow key={tx.id} className="hover:bg-muted/30">
-                        <TableCell className="text-xs font-mono">{tx.tanggal}</TableCell>
-                        <TableCell className="text-xs font-semibold text-foreground">
-                          {tx.kategori}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-medium max-w-[150px] truncate" title={tx.keterangan}>
+          <div className="border rounded-2xl bg-card overflow-hidden shadow-sm">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs w-20">Tanggal</TableHead>
+                  <TableHead className="text-xs">Kategori</TableHead>
+                  <TableHead className="text-xs">Kontrak</TableHead>
+                  <TableHead className="text-xs text-right">Nominal</TableHead>
+                  {isWriteAllowed && <TableHead className="text-xs text-right w-16">Aksi</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedIncome.map((tx: any) => {
+                  const isManual = tx.source_type === "Manual";
+                  return (
+                    <TableRow 
+                      key={tx.id} 
+                      className="hover:bg-muted/30 cursor-pointer transition-colors"
+                      onClick={() => setSelectedDetailTx(tx)}
+                    >
+                      <TableCell className="text-xs font-mono">{tx.tanggal}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="font-semibold text-foreground">{tx.kategori}</div>
+                        <div className="text-[9px] text-muted-foreground max-w-[120px] truncate" title={tx.keterangan}>
                           {tx.keterangan || "-"}
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-bold text-emerald-500">
-                          +{formatCurrency(tx.nominal)}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isManual ? (
-                            <Badge variant="outline" className="text-[10px] font-semibold">
-                              Manual
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="bg-orange-500/10 text-orange-600 border-orange-500/20 text-[10px] font-semibold uppercase tracking-wider"
-                            >
-                              Auto ({tx.source_type})
-                            </Badge>
-                          )}
-                        </TableCell>
-                        {isWriteAllowed && (
-                          <TableCell className="text-xs text-right space-x-1">
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-medium text-muted-foreground">
+                        {tx.kontrak_hauling?.kode_kontrak || "-"}
+                      </TableCell>
+                      <TableCell className="text-xs text-right font-bold text-emerald-500">
+                        +{formatCurrency(tx.nominal)}
+                      </TableCell>
+                      {isWriteAllowed && (
+                        <TableCell className="text-xs text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
                             {isManual ? (
                               <>
                                 <Button
@@ -682,7 +641,7 @@ export function FinancialReportView() {
                                   size="icon"
                                   className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                 >
-                                  <Edit2 size={13} />
+                                  <Edit2 size={12} />
                                 </Button>
                                 <Button
                                   onClick={() => handleDelete(tx.id)}
@@ -690,116 +649,110 @@ export function FinancialReportView() {
                                   size="icon"
                                   className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
                                 >
-                                  <Trash2 size={13} />
+                                  <Trash2 size={12} />
                                 </Button>
                               </>
                             ) : (
-                              <div className="inline-block text-[10px] text-muted-foreground italic pr-2 select-none">
-                                Locked
-                              </div>
+                              <Badge variant="secondary" className="text-[8px] font-semibold text-muted-foreground bg-muted tracking-wider select-none px-1 py-0.5 uppercase">
+                                Auto ({tx.source_type})
+                              </Badge>
                             )}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })}
-                  {incomeTransactions.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={isWriteAllowed ? 6 : 5}
-                        className="text-center py-12 text-xs text-muted-foreground"
-                      >
-                        Tidak ada catatan pemasukan kas.
-                      </TableCell>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-
-              {/* Income Pagination */}
-              {totalIncomePages > 1 && (
-                <div className="flex items-center justify-between p-3.5 border-t bg-muted/10">
-                  <span className="text-[10px] text-muted-foreground">
-                    Hal {currentIncomePage} / {totalIncomePages} ({incomeTransactions.length})
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      onClick={() => setCurrentIncomePage((p) => Math.max(p - 1, 1))}
-                      disabled={currentIncomePage === 1}
-                      variant="outline"
-                      size="sm"
-                      className="text-[10px] px-2 h-7"
-                    >
-                      Prev
-                    </Button>
-                    <Button
-                      onClick={() => setCurrentIncomePage((p) => Math.min(p + 1, totalIncomePages))}
-                      disabled={currentIncomePage === totalIncomePages}
-                      variant="outline"
-                      size="sm"
-                      className="text-[10px] px-2 h-7"
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Panel: Pengeluaran Kas */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1.5">
-                <ArrowDownLeft size={14} /> Pengeluaran Kas (Cash Out)
-              </h4>
-              <Badge variant="outline" className="text-[10px] bg-rose-500/5 text-rose-500 border-rose-500/10 font-bold">
-                Total: {formatCurrency(cashFlowBlock.cashOut)}
-              </Badge>
-            </div>
-            <div className="border rounded-xl bg-card overflow-hidden shadow-sm">
-              <Table>
-                <TableHeader>
+                  );
+                })}
+                {incomeTransactions.length === 0 && (
                   <TableRow>
-                    <TableHead className="text-xs w-24">Tanggal</TableHead>
-                    <TableHead className="text-xs">Kategori</TableHead>
-                    <TableHead className="text-xs">Keterangan / Rincian</TableHead>
-                    <TableHead className="text-xs text-right">Nominal</TableHead>
-                    <TableHead className="text-xs">Sumber</TableHead>
-                    {isWriteAllowed && <TableHead className="text-xs text-right w-20">Aksi</TableHead>}
+                    <TableCell
+                      colSpan={isWriteAllowed ? 5 : 4}
+                      className="text-center py-12 text-xs text-muted-foreground italic"
+                    >
+                      Tidak ada catatan pemasukan kas.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedExpenseTransactions.map((tx: any) => {
-                    const isManual = tx.source_type === "Manual";
-                    return (
-                      <TableRow key={tx.id} className="hover:bg-muted/30">
-                        <TableCell className="text-xs font-mono">{tx.tanggal}</TableCell>
-                        <TableCell className="text-xs font-semibold text-foreground">
-                          {tx.kategori}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-medium max-w-[150px] truncate" title={tx.keterangan}>
+                )}
+              </TableBody>
+            </Table>
+
+            {/* Income Pagination */}
+            {totalIncomePages > 1 && (
+              <div className="flex items-center justify-between p-3 border-t bg-muted/10">
+                <span className="text-[10px] text-muted-foreground">
+                  Hal {currentIncomePage} / {totalIncomePages} ({incomeTransactions.length} item)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    onClick={() => setCurrentIncomePage((p) => Math.max(p - 1, 1))}
+                    disabled={currentIncomePage === 1}
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] px-2 h-7"
+                  >
+                    Prev
+                  </Button>
+                  <Button
+                    onClick={() => setCurrentIncomePage((p) => Math.min(p + 1, totalIncomePages))}
+                    disabled={currentIncomePage === totalIncomePages}
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] px-2 h-7"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Cash Out (Pengeluaran) */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1.5">
+              <ArrowDownLeft size={14} /> Pengeluaran Kas (Cash Out)
+            </h4>
+            <Badge variant="outline" className="text-[10px] bg-rose-500/5 text-rose-500 border-rose-500/10 font-bold">
+              Total: {formatCurrency(expenseTransactions.reduce((sum, tx) => sum + Number(tx.nominal), 0))}
+            </Badge>
+          </div>
+          <div className="border rounded-2xl bg-card overflow-hidden shadow-sm">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs w-20">Tanggal</TableHead>
+                  <TableHead className="text-xs">Kategori</TableHead>
+                  <TableHead className="text-xs">Kontrak</TableHead>
+                  <TableHead className="text-xs text-right">Nominal</TableHead>
+                  {isWriteAllowed && <TableHead className="text-xs text-right w-16">Aksi</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedExpense.map((tx: any) => {
+                  const isManual = tx.source_type === "Manual";
+                  return (
+                    <TableRow 
+                      key={tx.id} 
+                      className="hover:bg-muted/30 cursor-pointer transition-colors"
+                      onClick={() => setSelectedDetailTx(tx)}
+                    >
+                      <TableCell className="text-xs font-mono">{tx.tanggal}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="font-semibold text-foreground">{tx.kategori}</div>
+                        <div className="text-[9px] text-muted-foreground max-w-[120px] truncate" title={tx.keterangan}>
                           {tx.keterangan || "-"}
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-bold text-rose-600 dark:text-rose-400">
-                          -{formatCurrency(tx.nominal)}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isManual ? (
-                            <Badge variant="outline" className="text-[10px] font-semibold">
-                              Manual
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="bg-orange-500/10 text-orange-600 border-orange-500/20 text-[10px] font-semibold uppercase tracking-wider"
-                            >
-                              Auto ({tx.source_type})
-                            </Badge>
-                          )}
-                        </TableCell>
-                        {isWriteAllowed && (
-                          <TableCell className="text-xs text-right space-x-1">
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-medium text-muted-foreground">
+                        {tx.kontrak_hauling?.kode_kontrak || "-"}
+                      </TableCell>
+                      <TableCell className="text-xs text-right font-bold text-rose-600 dark:text-rose-400">
+                        -{formatCurrency(tx.nominal)}
+                      </TableCell>
+                      {isWriteAllowed && (
+                        <TableCell className="text-xs text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
                             {isManual ? (
                               <>
                                 <Button
@@ -808,7 +761,7 @@ export function FinancialReportView() {
                                   size="icon"
                                   className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                 >
-                                  <Edit2 size={13} />
+                                  <Edit2 size={12} />
                                 </Button>
                                 <Button
                                   onClick={() => handleDelete(tx.id)}
@@ -816,105 +769,191 @@ export function FinancialReportView() {
                                   size="icon"
                                   className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
                                 >
-                                  <Trash2 size={13} />
+                                  <Trash2 size={12} />
                                 </Button>
                               </>
                             ) : (
-                              <div className="inline-block text-[10px] text-muted-foreground italic pr-2 select-none">
-                                Locked
-                              </div>
+                              <Badge variant="secondary" className="text-[8px] font-semibold text-muted-foreground bg-muted tracking-wider select-none px-1 py-0.5 uppercase">
+                                Auto ({tx.source_type})
+                              </Badge>
                             )}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })}
-                  {expenseTransactions.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={isWriteAllowed ? 6 : 5}
-                        className="text-center py-12 text-xs text-muted-foreground"
-                      >
-                        Tidak ada catatan pengeluaran kas.
-                      </TableCell>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  );
+                })}
+                {expenseTransactions.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={isWriteAllowed ? 5 : 4}
+                      className="text-center py-12 text-xs text-muted-foreground italic"
+                    >
+                      Tidak ada catatan pengeluaran kas.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
 
-              {/* Expense Pagination */}
-              {totalExpensePages > 1 && (
-                <div className="flex items-center justify-between p-3.5 border-t bg-muted/10">
-                  <span className="text-[10px] text-muted-foreground">
-                    Hal {currentExpensePage} / {totalExpensePages} ({expenseTransactions.length})
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      onClick={() => setCurrentExpensePage((p) => Math.max(p - 1, 1))}
-                      disabled={currentExpensePage === 1}
-                      variant="outline"
-                      size="sm"
-                      className="text-[10px] px-2 h-7"
-                    >
-                      Prev
-                    </Button>
-                    <Button
-                      onClick={() => setCurrentExpensePage((p) => Math.min(p + 1, totalExpensePages))}
-                      disabled={currentExpensePage === totalExpensePages}
-                      variant="outline"
-                      size="sm"
-                      className="text-[10px] px-2 h-7"
-                    >
-                      Next
-                    </Button>
-                  </div>
+            {/* Expense Pagination */}
+            {totalExpensePages > 1 && (
+              <div className="flex items-center justify-between p-3 border-t bg-muted/10">
+                <span className="text-[10px] text-muted-foreground">
+                  Hal {currentExpensePage} / {totalExpensePages} ({expenseTransactions.length} item)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    onClick={() => setCurrentExpensePage((p) => Math.max(p - 1, 1))}
+                    disabled={currentExpensePage === 1}
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] px-2 h-7"
+                  >
+                    Prev
+                  </Button>
+                  <Button
+                    onClick={() => setCurrentExpensePage((p) => Math.min(p + 1, totalExpensePages))}
+                    disabled={currentExpensePage === totalExpensePages}
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] px-2 h-7"
+                  >
+                    Next
+                  </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
+
       </div>
 
-      {/* Manual Input Dialog */}
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+      {/* ────────────────────────────────────────────────────────
+          DIALOGS & MODALS
+         ──────────────────────────────────────────────────────── */}
+      
+      {/* 1. Transaction Detail Dialog */}
+      <Dialog open={!!selectedDetailTx} onOpenChange={() => setSelectedDetailTx(null)}>
+        <DialogContent className="sm:max-w-[420px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-sm font-bold">
-              {editTx ? "Ubah Catatan Transaksi Kas" : "Catat Transaksi Kas Baru"}
+            <DialogTitle className="text-sm font-bold flex items-center gap-2">
+              <FileText size={18} className="text-orange-500" /> Detail Transaksi Kas
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Mencatat pemasukan atau pengeluaran kas manual di luar transaksi otomatis system.
+              Informasi lengkap rincian arus kas masuk atau keluar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDetailTx && (
+            <div className="space-y-4 py-2">
+              {/* Type Badge Header Block */}
+              <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                selectedDetailTx.jenis === "Pemasukan"
+                  ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-800 dark:text-emerald-300"
+                  : "bg-rose-500/5 border-rose-500/20 text-rose-800 dark:text-rose-300"
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${
+                    selectedDetailTx.jenis === "Pemasukan" ? "bg-emerald-500" : "bg-rose-500"
+                  }`} />
+                  <span className="text-xs font-bold uppercase">{selectedDetailTx.jenis}</span>
+                </div>
+                <span className="text-xs text-muted-foreground font-mono">
+                  ID: {selectedDetailTx.id.substring(0, 8)}...
+                </span>
+              </div>
+
+              {/* Data Rows */}
+              <div className="space-y-2 text-xs border rounded-xl p-3 bg-muted/10">
+                <div className="flex justify-between items-center py-1 border-b">
+                  <span className="text-muted-foreground font-medium">Tanggal:</span>
+                  <span className="font-bold text-foreground">{selectedDetailTx.tanggal}</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b">
+                  <span className="text-muted-foreground font-medium">Kategori:</span>
+                  <span className="font-bold text-foreground">{selectedDetailTx.kategori}</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b">
+                  <span className="text-muted-foreground font-medium">Nominal:</span>
+                  <span className={`font-black text-sm ${
+                    selectedDetailTx.jenis === "Pemasukan" ? "text-emerald-500" : "text-rose-500"
+                  }`}>
+                    {selectedDetailTx.jenis === "Pemasukan" ? "+" : "-"}{formatCurrency(selectedDetailTx.nominal)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b">
+                  <span className="text-muted-foreground font-medium">Kontrak Kerja:</span>
+                  <span className="font-bold text-foreground text-right">
+                    {selectedDetailTx.kontrak_hauling
+                      ? `${selectedDetailTx.kontrak_hauling.kode_kontrak} (${selectedDetailTx.kontrak_hauling.perusahaan})`
+                      : "Semua / Umum"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-muted-foreground font-medium">Sumber Data:</span>
+                  <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 uppercase">
+                    {selectedDetailTx.source_type}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Description Block */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Keterangan Transaksi</label>
+                <div className="bg-muted/40 border p-3 rounded-xl text-xs leading-relaxed whitespace-pre-wrap text-foreground font-medium">
+                  {selectedDetailTx.keterangan || "Tidak ada rincian keterangan tambahan yang dicantumkan."}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="pt-2 border-t mt-2">
+            <Button onClick={() => setSelectedDetailTx(null)} className="bg-orange-500 hover:bg-orange-600 text-white text-xs h-9 rounded-xl w-full sm:w-auto">
+              Tutup Rincian
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 2. Manual Input Dialog (Add / Edit) */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-[420px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold">
+              {editTx ? "Ubah Catatan Transaksi" : "Catat Transaksi Baru"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Mencatat transaksi keuangan kas manual yang terintegrasi dengan kontrak hauling.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            
             {/* Tanggal */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                Tanggal Transaksi
-              </label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Tanggal Transaksi</label>
               <Input
                 type="date"
                 value={tanggal}
                 onChange={(e) => setTanggal(e.target.value)}
-                className="text-xs h-9 bg-card"
+                className="text-xs h-9 bg-card rounded-xl"
               />
             </div>
 
             {/* Jenis & Kategori */}
             <div className="grid grid-cols-2 gap-3">
+              
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                  Jenis Transaksi
-                </label>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Jenis</label>
                 <Select
                   value={jenis}
                   onValueChange={(val: "Pemasukan" | "Pengeluaran") => setJenis(val)}
                 >
-                  <SelectTrigger className="text-xs h-9 bg-card">
+                  <SelectTrigger className="text-xs h-9 bg-card rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="Pemasukan">Pemasukan (+)</SelectItem>
                     <SelectItem value="Pengeluaran">Pengeluaran (-)</SelectItem>
                   </SelectContent>
@@ -922,68 +961,83 @@ export function FinancialReportView() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                  Kategori
-                </label>
-                <Input
-                  placeholder="Sewa Unit, Wi-Fi, Toll, dll."
-                  value={kategori}
-                  onChange={(e) => setKategori(e.target.value)}
-                  className="text-xs h-9 bg-card"
-                />
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Kategori</label>
+                <Select value={kategori} onValueChange={setKategori}>
+                  <SelectTrigger className="text-xs h-9 bg-card rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {formCategoriesList.map((cat) => (
+                      <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
             </div>
 
             {/* Nominal */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                Nominal Transaksi (Rupiah)
-              </label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Nominal Rupiah</label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-bold">
-                  Rp
-                </span>
+                <span className="absolute left-3.5 top-2.5 text-xs text-muted-foreground font-bold">Rp</span>
                 <Input
                   type="number"
                   placeholder="0"
                   value={nominal}
                   onChange={(e) => setNominal(e.target.value)}
-                  className="pl-9 text-xs h-9 bg-card"
+                  className="pl-10 text-xs h-9 bg-card rounded-xl"
                 />
               </div>
             </div>
 
+            {/* Kontrak Kerja */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Kontrak Kerja Terkait</label>
+              <Select value={kontrakHaulingId} onValueChange={setKontrakHaulingId}>
+                <SelectTrigger className="text-xs h-9 bg-card rounded-xl">
+                  <SelectValue placeholder="Pilih Kontrak" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="none">Tidak Ada / Umum</SelectItem>
+                  {contracts.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                      {c.kode_kontrak} - {c.perusahaan}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Keterangan */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                Keterangan / Deskripsi
-              </label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Keterangan / Rincian</label>
               <Input
-                placeholder="Rincian informasi transaksi..."
+                placeholder="Deskripsi transaksi secara detail..."
                 value={keterangan}
                 onChange={(e) => setKeterangan(e.target.value)}
-                className="text-xs h-9 bg-card"
+                className="text-xs h-9 bg-card rounded-xl"
               />
             </div>
 
             <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={closeDialog} className="text-xs h-9">
+              <Button type="button" variant="outline" onClick={closeDialog} className="text-xs h-9 rounded-xl">
                 Batal
               </Button>
               <Button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="bg-orange-500 hover:bg-orange-600 text-white text-xs h-9"
+                className="bg-orange-500 hover:bg-orange-600 text-white text-xs h-9 rounded-xl"
               >
-                {createMutation.isPending || updateMutation.isPending
-                  ? "Menyimpan..."
-                  : "Simpan Transaksi"}
+                {createMutation.isPending || updateMutation.isPending ? "Menyimpan..." : "Simpan Transaksi"}
               </Button>
             </DialogFooter>
+
           </form>
         </DialogContent>
       </Dialog>
 
+      {/* 3. Delete Confirmation Dialog */}
       <DeleteConfirmDialog
         isOpen={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
@@ -996,6 +1050,7 @@ export function FinancialReportView() {
         title="Hapus Transaksi Kas"
         description="Apakah Anda yakin ingin menghapus catatan transaksi manual ini? Tindakan ini tidak dapat dibatalkan."
       />
+
     </div>
   );
 }

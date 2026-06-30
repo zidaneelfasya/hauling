@@ -116,7 +116,7 @@ export default async function DashboardPage() {
   // 7. Fetch Contracts
   const { data: contracts } = await supabase
     .from("kontrak_hauling")
-    .select("id, kode_kontrak, perusahaan, tanggal_mulai, tanggal_selesai, jumlah_unit, status")
+    .select("id, kode_kontrak, perusahaan, tanggal_mulai, tanggal_selesai, status, unit(id)")
     .order("kode_kontrak", { ascending: true });
 
   // 8. Fetch Payrolls

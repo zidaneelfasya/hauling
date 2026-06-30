@@ -19,6 +19,9 @@ Dashboard ini dirancang untuk memberikan visibilitas penuh bagi manajemen (Admin
   - **Profit Bersih Riil:** `Pendapatan - Pengeluaran Riil`.
 - **Grafik Interaktif:** Visualisasi perbandingan harian (pendapatan vs HPP vs pembelian BBM) dan tren bulanan (pendapatan vs biaya riil vs profit bersih) menggunakan Recharts, serta diagram porsi pengeluaran operasional.
 
+> [!NOTE]
+> Untuk penjelasan detail mengenai rumus matematika, logika pemrograman, dan simulasi alur keuangan yang menghasilkan angka-angka di atas, silakan baca **[Panduan Perhitungan Dashboard](file:///c:/Users/zidane/OneDrive/Documents/GitHub/hauling/README_DASHBOARD_CALCULATIONS.md)**.
+
 ### 2. Modul Kontrak Hauling (Master Data)
 - Skema hauling menggunakan kontrak berbasis tarif per trip (ritase) dan tonase nikel.
 - Mengeliminasi parameter finansial statis lama (nilai kontrak tahunan, target margin, budget operasional) dari database untuk fokus pada profitabilitas aktual berbasis volume pengiriman riil.

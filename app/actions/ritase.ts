@@ -267,6 +267,22 @@ export async function deleteRitase(id: string) {
   return true;
 }
 
+export async function deleteMultipleRitase(ids: string[]) {
+  const { profile } = await getUserInfo();
+  const supabase = await createClient();
+
+  if (!["Owner", "Full Access", "Admin"].includes(profile.role)) {
+    throw new Error("Forbidden: Hanya Admin yang dapat menghapus data ritase.");
+  }
+
+  const { error } = await supabase.from("ritase").delete().in("id", ids);
+  if (error) throw error;
+
+  await writeAuditLog(`Menghapus Beberapa Ritase ID: ${ids.join(", ")}`);
+  revalidatePath("/dashboard/ritase");
+  return true;
+}
+
 export async function approveRitase(id: string) {
   const { profile } = await getUserInfo();
   const supabase = await createClient();

@@ -1,17 +1,17 @@
 -- Seeder file for Hauling Management System (HMS)
 
 -- 1. Seed KONTRAK HAULING (Hauling Contracts) - 10 Contracts
-INSERT INTO public.kontrak_hauling (kode_kontrak, perusahaan, tanggal_mulai, tanggal_selesai, jumlah_unit, status) VALUES
-('HK-2026-001', 'PT Vale Indonesia Tbk', '2026-01-01', '2026-12-31', 5, 'Aktif'),
-('HK-2026-002', 'PT Indonesia Morowali Industrial Park', '2026-01-01', '2026-12-31', 8, 'Aktif'),
-('HK-2026-003', 'PT Harita Nickel', '2026-02-01', '2026-11-30', 6, 'Aktif'),
-('HK-2026-004', 'PT Weda Bay Nickel', '2026-03-01', '2026-09-30', 4, 'Aktif'),
-('HK-2026-005', 'PT Virtue Dragon Nickel Industry', '2026-01-15', '2026-07-15', 5, 'Aktif'),
-('HK-2026-006', 'PT Aneka Tambang Tbk (Antam)', '2026-01-01', '2026-12-31', 10, 'Aktif'),
-('HK-2026-007', 'PT Bintangdelapan Mineral', '2026-04-01', '2026-10-31', 3, 'Aktif'),
-('HK-2026-008', 'PT Sulawesi Cahaya Mineral', '2026-05-01', '2026-12-31', 7, 'Aktif'),
-('HK-2026-009', 'PT Trimegah Bangun Persada', '2026-06-01', '2027-05-31', 12, 'Aktif'),
-('HK-2026-010', 'PT Ceria Nugraha Indotama', '2026-01-01', '2026-06-30', 2, 'Selesai');
+INSERT INTO public.kontrak_hauling (kode_kontrak, perusahaan, tanggal_mulai, tanggal_selesai, status) VALUES
+('HK-2026-001', 'PT Vale Indonesia Tbk', '2026-01-01', '2026-12-31', 'Aktif'),
+('HK-2026-002', 'PT Indonesia Morowali Industrial Park', '2026-01-01', '2026-12-31', 'Aktif'),
+('HK-2026-003', 'PT Harita Nickel', '2026-02-01', '2026-11-30', 'Aktif'),
+('HK-2026-004', 'PT Weda Bay Nickel', '2026-03-01', '2026-09-30', 'Aktif'),
+('HK-2026-005', 'PT Virtue Dragon Nickel Industry', '2026-01-15', '2026-07-15', 'Aktif'),
+('HK-2026-006', 'PT Aneka Tambang Tbk (Antam)', '2026-01-01', '2026-12-31', 'Aktif'),
+('HK-2026-007', 'PT Bintangdelapan Mineral', '2026-04-01', '2026-10-31', 'Aktif'),
+('HK-2026-008', 'PT Sulawesi Cahaya Mineral', '2026-05-01', '2026-12-31', 'Aktif'),
+('HK-2026-009', 'PT Trimegah Bangun Persada', '2026-06-01', '2027-05-31', 'Aktif'),
+('HK-2026-010', 'PT Ceria Nugraha Indotama', '2026-01-01', '2026-06-30', 'Selesai');
 
 -- 2. Seed LOKASI LOADING - 10 Locations
 INSERT INTO public.lokasi_loading (nama_lokasi) VALUES

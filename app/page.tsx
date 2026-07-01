@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import PixelFooter from "@/components/pixel-footer";
 import {
   Truck,
   ArrowRight,
@@ -897,90 +898,7 @@ export default function Home() {
       </div>
 
       {/* Sticky Reveal Footer (Combined CTA + Footer) */}
-      <footer className="sticky bottom-0 h-[90vh] md:h-[80vh] min-h-[600px] w-full -z-10 bg-[#0C0C0C] text-[#F7F5F2] overflow-hidden flex flex-col justify-between font-jakarta p-8 md:p-20 select-none">
-
-        {/* Full-bleed background image with Amman stippling/vignette effect */}
-        <div className="absolute inset-0 -z-20">
-          <Image
-            src="/footer_mining_pit.png"
-            alt="Terraced Mining Pit Amman style"
-            fill
-            sizes="100vw"
-            className="object-cover opacity-25 md:opacity-35 transition-transform duration-[10000ms] ease-out hover:scale-105"
-          />
-          {/* Subtle noise/gradient overlays to merge with solid black */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0C0C0C] via-[#0C0C0C]/50 to-[#0C0C0C]" />
-          <div className="absolute inset-0 bg-radial-gradient(circle at center, transparent 30%, rgba(12, 12, 12, 0.8) 100%)" />
-        </div>
-
-        {/* Top Part: CTA with extraordinary typography */}
-        <div className="relative z-10 max-w-7xl mx-auto w-full pt-12 md:pt-20 flex flex-col items-start gap-6 md:gap-8">
-          <span className="font-outfit text-xs font-bold uppercase tracking-[0.4em] text-[#C67A2B] bg-[#C67A2B]/10 px-3 py-1.5 rounded">
-            PARTNERSHIP INQUIRIES
-          </span>
-          <h2 className="font-syne text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tighter leading-[0.95] text-white max-w-4xl select-none">
-            OPTIMIZE LOGISTICS.<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C67A2B] to-[#56694E]">
-              SHAPE THE FUTURE.
-            </span>
-          </h2>
-          <p className="text-neutral-400 font-light text-sm md:text-lg max-w-2xl leading-relaxed">
-            Leverage our telemetry-linked heavy fleet and complete hauling audit systems to hit your monthly yield targets securely.
-          </p>
-          <Link
-            href="/dashboard"
-            className="bg-white text-[#1B1B1B] hover:bg-[#C67A2B] hover:text-white text-xs font-bold uppercase tracking-widest px-8 py-5 rounded-full transition-all duration-300 flex items-center gap-3 shadow-lg group pointer-events-auto"
-          >
-            Access ERP Dashboard
-            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-          </Link>
-        </div>
-
-        {/* Bottom Part: Amman-style minimalist footer links & legal branding */}
-        <div className="relative z-10 max-w-7xl mx-auto w-full border-t border-neutral-800/80 pt-10 pb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-10 text-[11px] text-neutral-400">
-
-          {/* Logo & Corporate Tagline */}
-          <div className="space-y-3">
-            <h3 className="font-syne text-lg font-bold tracking-tight text-white uppercase leading-none">
-              PT HAULING KEMBAR JAYA
-            </h3>
-            <p className="text-[10px] text-neutral-500 uppercase tracking-wider">
-              Heavy Operations & Mining Logistics Services
-            </p>
-            <span className="block text-[10px] text-neutral-600 font-mono">
-              © {new Date().getFullYear()} — Indonesia. All rights reserved.
-            </span>
-          </div>
-
-          {/* Amman-style minimal address blocks */}
-          <div className="flex flex-wrap gap-8 md:gap-16">
-            <div className="space-y-2">
-              <span className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest block">Corporate Office</span>
-              <p className="max-w-[200px] leading-relaxed">Jl. Tambang Lestari Blok A4, Jakarta, Indonesia</p>
-            </div>
-            <div className="space-y-2">
-              <span className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest block">Site Operations</span>
-              <p className="max-w-[200px] leading-relaxed">Kolonodale & Sorowako Operations, Sulawesi, Indonesia</p>
-            </div>
-          </div>
-
-          {/* Social media and privacy */}
-          <div className="flex flex-col items-start md:items-end gap-3 shrink-0">
-            <div className="flex gap-4 text-xs">
-              <a href="#" className="hover:text-white transition-colors">Privacy Statement</a>
-              <span>•</span>
-              <a href="#" className="hover:text-white transition-colors">Terms of Use</a>
-              <span>•</span>
-              <a href="/dashboard" className="hover:text-white transition-colors font-bold text-[#C67A2B]">System Portal</a>
-            </div>
-            <div className="text-[10px] text-neutral-600 font-mono">
-              HMS://HKJ.OPERATIONS-CONTROL
-            </div>
-          </div>
-
-        </div>
-
-      </footer>
+      <PixelFooter />
     </div>
   );
 }

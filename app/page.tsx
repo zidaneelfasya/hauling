@@ -233,21 +233,29 @@ export default function Home() {
 
   const currentRent = getCalculatedRent(fleets[activeFleet].baseMonthlyRent);
 
+  const grainOverlay = (
+    <div 
+      className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 z-10" 
+      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} 
+    />
+  );
+
   return (
-    <div className="light min-h-screen bg-[#F7F5F2] text-[#1B1B1B] font-sans antialiased selection:bg-[#C67A2B] selection:text-white">
+    <div className="light min-h-screen bg-white text-neutral-900 font-sans antialiased selection:bg-neutral-900 selection:text-white">
       {/* Dynamic Font Styling */}
       <style dangerouslySetInnerHTML={{
         __html: `
-          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&family=Outfit:wght@200;300;400;500;600;700&display=swap');
-          .font-syne { font-family: 'Syne', sans-serif; }
-          .font-outfit { font-family: 'Outfit', sans-serif; }
-          .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          .font-sans { font-family: 'Inter', sans-serif; }
+          .font-syne { font-family: 'Inter', sans-serif; letter-spacing: -0.02em; }
+          .font-outfit { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
+          .font-jakarta { font-family: 'Inter', sans-serif; }
         `
       }} />
 
       {/* Glassmorphic Navbar */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 font-jakarta border-b ${scrolled
-          ? "bg-[#F7F5F2]/80 backdrop-blur-md border-[#E4E4E4] py-4 shadow-sm"
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 font-sans border-b ${scrolled
+          ? "bg-white/90 backdrop-blur-md border-neutral-200 py-4 shadow-sm"
           : "bg-transparent border-transparent py-6"
         }`}>
         <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
@@ -259,25 +267,25 @@ export default function Home() {
               alt="Picture of the author"
             />
             <div className="flex flex-col">
-              <span className="font-bold tracking-tight text-sm md:text-base leading-tight">HAULING KEMBAR JAYA</span>
-              <span className="text-[10px] text-[#6D6D6D] tracking-widest uppercase">Mining Logistics</span>
+              <span className="font-semibold tracking-tight text-sm md:text-base leading-tight">HAULING KEMBAR JAYA</span>
+              <span className="text-[10px] text-neutral-500 tracking-widest uppercase font-medium">Mining Logistics</span>
             </div>
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8 text-xs font-semibold uppercase tracking-wider text-[#6D6D6D]">
-            <a href="#about" className="hover:text-[#1B1B1B] transition-colors">Story</a>
-            <a href="#operational-journey" className="hover:text-[#1B1B1B] transition-colors">Operational Journey</a>
-            <a href="#fleet" className="hover:text-[#1B1B1B] transition-colors">Fleet Specs</a>
-            <a href="#performance" className="hover:text-[#1B1B1B] transition-colors">Performance</a>
-            <a href="#innovation" className="hover:text-[#1B1B1B] transition-colors">Innovation</a>
+          <nav className="hidden md:flex items-center gap-8 text-xs font-medium uppercase tracking-widest text-neutral-500">
+            <a href="#about" className="hover:text-neutral-900 transition-colors">Story</a>
+            <a href="#operational-journey" className="hover:text-neutral-900 transition-colors">Operational Journey</a>
+            <a href="#fleet" className="hover:text-neutral-900 transition-colors">Fleet Specs</a>
+            <a href="#performance" className="hover:text-neutral-900 transition-colors">Performance</a>
+            <a href="#innovation" className="hover:text-neutral-900 transition-colors">Innovation</a>
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
             {user ? (
               <Link
                 href="/dashboard"
-                className="bg-[#1B1B1B] text-[#F7F5F2] hover:bg-[#C67A2B] text-xs font-bold uppercase tracking-widest px-6 py-3 rounded-full transition-all duration-300 flex items-center gap-2 shadow-sm"
+                className="bg-neutral-900 text-white hover:bg-neutral-800 text-xs font-semibold uppercase tracking-widest px-6 py-3 rounded-md transition-all duration-300 flex items-center gap-2"
               >
                 <LayoutDashboard className="w-4 h-4" />
                 Go to Dashboard
@@ -285,7 +293,7 @@ export default function Home() {
             ) : (
               <Link
                 href="/dashboard"
-                className="bg-[#1B1B1B] text-[#F7F5F2] hover:bg-[#C67A2B] text-xs font-bold uppercase tracking-widest px-6 py-3 rounded-full transition-all duration-300 flex items-center gap-2 shadow-sm"
+                className="bg-neutral-900 text-white hover:bg-neutral-800 text-xs font-semibold uppercase tracking-widest px-6 py-3 rounded-md transition-all duration-300 flex items-center gap-2"
               >
                 Enterprise Sign In
                 <ArrowRight className="w-4 h-4" />
@@ -296,7 +304,7 @@ export default function Home() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2 text-[#1B1B1B]"
+            className="md:hidden p-2 text-neutral-900"
             aria-label="Toggle menu"
           >
             {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -305,19 +313,19 @@ export default function Home() {
       </header>
 
       {/* Mobile Drawer */}
-      <div className={`fixed inset-0 z-40 bg-[#F7F5F2] transform ${isMenuOpen ? "translate-x-0" : "translate-x-full"
+      <div className={`fixed inset-0 z-40 bg-white transform ${isMenuOpen ? "translate-x-0" : "translate-x-full"
         } transition-transform duration-300 ease-in-out md:hidden flex flex-col pt-24 px-8`}>
-        <nav className="flex flex-col gap-6 text-lg font-jakarta font-semibold text-[#1B1B1B] mb-12">
-          <a href="#about" onClick={() => setIsMenuOpen(false)} className="border-b border-[#E4E4E4] pb-3">Story</a>
-          <a href="#operational-journey" onClick={() => setIsMenuOpen(false)} className="border-b border-[#E4E4E4] pb-3">Operational Journey</a>
-          <a href="#fleet" onClick={() => setIsMenuOpen(false)} className="border-b border-[#E4E4E4] pb-3">Fleet Specs</a>
-          <a href="#performance" onClick={() => setIsMenuOpen(false)} className="border-b border-[#E4E4E4] pb-3">Performance</a>
-          <a href="#innovation" onClick={() => setIsMenuOpen(false)} className="border-b border-[#E4E4E4] pb-3">Innovation</a>
+        <nav className="flex flex-col gap-6 text-lg font-sans font-medium text-neutral-900 mb-12">
+          <a href="#about" onClick={() => setIsMenuOpen(false)} className="border-b border-neutral-100 pb-3">Story</a>
+          <a href="#operational-journey" onClick={() => setIsMenuOpen(false)} className="border-b border-neutral-100 pb-3">Operational Journey</a>
+          <a href="#fleet" onClick={() => setIsMenuOpen(false)} className="border-b border-neutral-100 pb-3">Fleet Specs</a>
+          <a href="#performance" onClick={() => setIsMenuOpen(false)} className="border-b border-neutral-100 pb-3">Performance</a>
+          <a href="#innovation" onClick={() => setIsMenuOpen(false)} className="border-b border-neutral-100 pb-3">Innovation</a>
         </nav>
         <Link
           href="/dashboard"
           onClick={() => setIsMenuOpen(false)}
-          className="bg-[#1B1B1B] text-[#F7F5F2] py-4 rounded-xl text-center font-bold tracking-wider uppercase text-sm flex items-center justify-center gap-2"
+          className="bg-neutral-900 text-white py-4 rounded-md text-center font-semibold tracking-wider uppercase text-sm flex items-center justify-center gap-2"
         >
           {user ? <LayoutDashboard className="w-5 h-5" /> : null}
           {user ? "Open Dashboard" : "Sign In to Portal"}
@@ -326,42 +334,38 @@ export default function Home() {
       </div>
 
       {/* Main Content Wrapper for Sticky Reveal Footer */}
-      <div className="relative z-10 bg-[#F7F5F2] shadow-[0_20px_50px_rgba(0,0,0,0.15)] pb-1">
+      <div className="relative z-10 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.05)] pb-1">
         {/* Hero Section */}
         <section className="relative min-h-[85vh] pt-32 pb-12 flex flex-col justify-center max-w-7xl mx-auto px-6 md:px-12 overflow-hidden">
-          {/* Subtle Decorative Elements */}
-          <div className="absolute top-1/4 right-0 w-[500px] h-[500px] rounded-full bg-[#C67A2B]/5 blur-[120px] pointer-events-none -z-10" />
-          <div className="absolute bottom-10 left-10 w-[300px] h-[300px] rounded-full bg-[#56694E]/5 blur-[80px] pointer-events-none -z-10" />
-
-          <div className="mt-8">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="h-px w-8 bg-[#C67A2B]" />
-              <span className="font-outfit text-xs font-semibold uppercase tracking-[0.25em] text-[#C67A2B]">
+          <div className="mt-8 relative z-10">
+            <div className="flex items-center gap-3 mb-8">
+              <span className="h-px w-8 bg-neutral-900" />
+              <span className="font-sans text-xs font-semibold uppercase tracking-widest text-neutral-900">
                 PT Hauling Kembar Jaya
               </span>
             </div>
 
-            <h1 className="font-syne text-[2.8rem] sm:text-[4rem] md:text-[6.5rem] leading-[1.05] tracking-tight font-extrabold text-[#1B1B1B] max-w-5xl select-none">
+            <h1 className="font-sans text-[2.8rem] sm:text-[4.5rem] md:text-[6.5rem] leading-[1.05] tracking-tight font-semibold text-neutral-900 max-w-5xl select-none">
               HAULING<br />
-              <span className="text-[#C67A2B]">OPERATIONS</span><br />
+              <span className="text-neutral-400">OPERATIONS</span><br />
               DEFINED BY PRECISION.
             </h1>
 
             <div className="grid md:grid-cols-12 gap-8 mt-12 md:mt-16 items-start">
-              <div className="md:col-span-5 font-jakarta text-base md:text-lg text-[#6D6D6D] leading-relaxed font-light">
+              <div className="md:col-span-5 font-sans text-base md:text-lg text-neutral-500 leading-relaxed font-normal">
                 We engineer logistics for high-volume mining projects. Combining heavy fleet operations, telemetry control, and complete safety parameters to deliver nickel ore efficiently.
               </div>
               <div className="md:col-span-7 flex flex-wrap gap-4 md:justify-end">
                 <Link
                   href="/dashboard"
-                  className="bg-[#1B1B1B] text-[#F7F5F2] hover:bg-[#C67A2B] text-xs font-bold uppercase tracking-widest px-8 py-4 rounded-full transition-all duration-300 flex items-center gap-3 shadow-md group"
+                  className="bg-neutral-900 text-white hover:bg-neutral-800 text-xs font-semibold uppercase tracking-widest px-8 py-4 rounded-md transition-all duration-300 flex items-center gap-3 group"
                 >
                   Access Control Dashboard
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </Link>
                 <a
                   href="#operational-journey"
-                  className="border border-[#E4E4E4] bg-white text-[#1B1B1B] hover:bg-neutral-50 text-xs font-bold uppercase tracking-widest px-8 py-4 rounded-full transition-all duration-300 flex items-center gap-2"
+                  className="border border-neutral-200 bg-transparent text-neutral-900 hover:bg-neutral-50 text-xs font-semibold uppercase tracking-widest px-8 py-4 rounded-md transition-all duration-300 flex items-center gap-2"
                 >
                   Observe Logistics Cycle
                 </a>
@@ -378,15 +382,15 @@ export default function Home() {
             "--reveal-progress": "0",
             "--clip-tb-coef": isMobile ? "25%" : "17.5%",
             "--clip-lr-coef": isMobile ? "5%" : "15%",
-            "--border-radius-coef": isMobile ? "16px" : "24px",
+            "--border-radius-coef": "0px", // Sharp corners for editorial look
           } as React.CSSProperties}
         >
           <div className="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden">
             <div
-              className="relative w-full h-full shadow-2xl flex items-center justify-center overflow-hidden"
+              className="relative w-full h-full flex items-center justify-center overflow-hidden bg-neutral-100"
               style={{
-                clipPath: "inset(calc(var(--clip-tb-coef) * (1 - var(--reveal-progress))) calc(var(--clip-lr-coef) * (1 - var(--reveal-progress))) calc(var(--clip-tb-coef) * (1 - var(--reveal-progress))) calc(var(--clip-lr-coef) * (1 - var(--reveal-progress))) round calc(var(--border-radius-coef) * (1 - var(--reveal-progress))))",
-                WebkitClipPath: "inset(calc(var(--clip-tb-coef) * (1 - var(--reveal-progress))) calc(var(--clip-lr-coef) * (1 - var(--reveal-progress))) calc(var(--clip-tb-coef) * (1 - var(--reveal-progress))) calc(var(--clip-lr-coef) * (1 - var(--reveal-progress))) round calc(var(--border-radius-coef) * (1 - var(--reveal-progress))))",
+                clipPath: "inset(calc(var(--clip-tb-coef) * (1 - var(--reveal-progress))) calc(var(--clip-lr-coef) * (1 - var(--reveal-progress))) calc(var(--clip-tb-coef) * (1 - var(--reveal-progress))) calc(var(--clip-lr-coef) * (1 - var(--reveal-progress))))",
+                WebkitClipPath: "inset(calc(var(--clip-tb-coef) * (1 - var(--reveal-progress))) calc(var(--clip-lr-coef) * (1 - var(--reveal-progress))) calc(var(--clip-tb-coef) * (1 - var(--reveal-progress))) calc(var(--clip-lr-coef) * (1 - var(--reveal-progress))))",
                 willChange: "clip-path",
               }}
             >
@@ -398,46 +402,49 @@ export default function Home() {
                 sizes="100vw"
                 className="object-cover"
                 style={{
-                  transform: "scale(calc(1.15 - 0.15 * var(--reveal-progress)))",
+                  transform: "scale(calc(1.1 - 0.1 * var(--reveal-progress)))",
                   willChange: "transform",
+                  filter: "grayscale(20%) contrast(110%)", // slightly editorial look
                 }}
               />
-              {/* Dark vignette overlay */}
+              {grainOverlay}
+              
+              {/* Subtle gradient overlay to ensure text legibility without heavy vignette */}
               <div
-                className="absolute inset-0"
+                className="absolute inset-0 bg-black"
                 style={{
-                  background: "linear-gradient(to top, rgba(27, 27, 27, calc(0.4 + 0.4 * var(--reveal-progress))), rgba(27, 27, 27, calc(0.1 * var(--reveal-progress))))",
-                  willChange: "background",
+                  opacity: "calc(0.1 + 0.3 * var(--reveal-progress))",
+                  willChange: "opacity",
                 }}
               />
 
               {/* Absolute bottom caption */}
               <div
-                className="absolute bottom-10 left-10 md:bottom-16 md:left-16 text-white font-jakarta transition-opacity duration-300"
+                className="absolute bottom-10 left-10 md:bottom-16 md:left-16 text-white font-sans transition-opacity duration-300 z-20"
                 style={{
                   opacity: "clamp(0, calc(1 - var(--reveal-progress) * 2.5), 1)",
                 } as React.CSSProperties}
               >
-                <p className="font-outfit text-xs font-semibold tracking-widest uppercase text-[#C67A2B] mb-2">
+                <p className="text-[10px] font-semibold tracking-widest uppercase text-white/70 mb-2">
                   Active Fleet Focus
                 </p>
-                <h3 className="font-syne text-xl md:text-3xl font-bold tracking-tight">
+                <h3 className="text-xl md:text-2xl font-medium tracking-tight">
                   PT Vale Indonesia Nickel Project Site
                 </h3>
               </div>
 
               {/* Center Callout - displays when fullscreen */}
               <div
-                className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none transition-all duration-300"
+                className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none transition-all duration-300 z-20"
                 style={{
                   opacity: "clamp(0, calc((var(--reveal-progress) - 0.45) / 0.55), 1)",
-                  transform: "scale(calc(0.92 + 0.08 * var(--reveal-progress)))",
+                  transform: "scale(calc(0.95 + 0.05 * var(--reveal-progress)))",
                 } as React.CSSProperties}
               >
-                <span className="font-outfit text-xs font-bold uppercase tracking-[0.3em] text-[#C67A2B] mb-4">
+                <span className="text-xs font-semibold uppercase tracking-widest text-white/70 mb-4">
                   ENTERPRISE LOGISTICS SYSTEM
                 </span>
-                <h2 className="font-syne text-2xl sm:text-4xl md:text-5xl font-extrabold text-white leading-tight max-w-4xl">
+                <h2 className="text-2xl sm:text-4xl md:text-5xl font-semibold text-white leading-tight max-w-4xl tracking-tight">
                   UNCOMPROMISING PRECISION IN EVERY TRANSIT
                 </h2>
               </div>
@@ -446,68 +453,68 @@ export default function Home() {
         </div>
 
         {/* Story / Mission Section */}
-        <section id="about" className="py-24 md:py-36 bg-white border-y border-[#E4E4E4] relative overflow-hidden">
-          <div className="max-w-7xl mx-auto px-6 md:px-12 grid md:grid-cols-12 gap-12 items-center">
-            <div className="md:col-span-6 space-y-8">
-              <span className="font-outfit text-xs font-bold uppercase tracking-[0.2em] text-[#C67A2B] bg-[#C67A2B]/10 px-3 py-1.5 rounded">
+        <section id="about" className="py-24 md:py-36 bg-white border-y border-neutral-100 relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 grid md:grid-cols-12 gap-16 md:gap-24 items-center">
+            <div className="md:col-span-6 space-y-10">
+              <span className="font-sans text-xs font-semibold uppercase tracking-widest text-neutral-400">
                 OUR MISSION STATEMENT
               </span>
-              <h2 className="font-syne text-3xl md:text-5xl font-extrabold leading-[1.1] tracking-tight text-[#1B1B1B]">
+              <h2 className="font-sans text-3xl md:text-4xl lg:text-5xl font-medium leading-[1.1] tracking-tight text-neutral-900">
                 The backbone of heavy mining logistics in Indonesia.
               </h2>
-              <p className="font-jakarta text-[#6D6D6D] leading-relaxed text-base font-light">
+              <p className="font-sans text-neutral-500 leading-relaxed text-lg font-normal max-w-lg">
                 Our enterprise logistics management enables miners to control costs, audit haul routes, and maximize tonase targets. From loading site dispatch to quality assay verifications, every cycle is integrated into a unified portal.
               </p>
-              <div className="grid grid-cols-2 gap-6 pt-4">
-                <div className="border-l-2 border-[#C67A2B] pl-4">
-                  <h4 className="font-syne text-3xl font-extrabold text-[#1B1B1B]">
+              <div className="grid grid-cols-2 gap-8 pt-6 border-t border-neutral-100">
+                <div>
+                  <h4 className="font-sans text-4xl font-semibold text-neutral-900 tracking-tight">
                     <Counter end={99} suffix="%" />
                   </h4>
-                  <p className="text-xs text-[#6D6D6D] uppercase tracking-wider mt-1">SLA Contract Adherence</p>
+                  <p className="text-xs text-neutral-400 uppercase tracking-widest mt-2 font-medium">SLA Contract Adherence</p>
                 </div>
-                <div className="border-l-2 border-[#56694E] pl-4">
-                  <h4 className="font-syne text-3xl font-extrabold text-[#1B1B1B]">
+                <div>
+                  <h4 className="font-sans text-4xl font-semibold text-neutral-900 tracking-tight">
                     <Counter end={0} prefix="Zero " />
                   </h4>
-                  <p className="text-xs text-[#6D6D6D] uppercase tracking-wider mt-1">LTI - Lost Time Injury Rate</p>
+                  <p className="text-xs text-neutral-400 uppercase tracking-widest mt-2 font-medium">LTI - Lost Time Injury Rate</p>
                 </div>
               </div>
             </div>
-            <div className="md:col-span-6 relative w-full h-[320px] md:h-[450px] rounded-2xl overflow-hidden border border-[#E4E4E4] group shadow-inner">
+            <div className="md:col-span-6 relative w-full h-[400px] md:h-[600px] overflow-hidden">
               <Image
                 src="/mining_road.png"
                 alt="Mining road industrial logistics"
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
+                className="object-cover filter grayscale-[20%] contrast-[110%]"
               />
-              <div className="absolute inset-0 bg-[#C67A2B]/10 mix-blend-multiply opacity-20 group-hover:opacity-0 transition-opacity duration-700" />
+              {grainOverlay}
             </div>
           </div>
         </section>
 
         {/* Operational Journey: Interactive Timeline Section */}
-        <section id="operational-journey" className="py-24 md:py-36 max-w-7xl mx-auto px-6 md:px-12 relative">
-          <div className="text-center max-w-3xl mx-auto mb-16 md:mb-24">
-            <span className="font-outfit text-xs font-semibold uppercase tracking-[0.25em] text-[#56694E] mb-3 inline-block">
+        <section id="operational-journey" className="py-24 md:py-36 max-w-7xl mx-auto px-6 md:px-12 relative border-b border-neutral-100">
+          <div className="max-w-3xl mb-16 md:mb-24">
+            <span className="font-sans text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4 inline-block">
               PROCESS FLOW & TRANSPARENCY
             </span>
-            <h2 className="font-syne text-3xl md:text-5xl font-extrabold tracking-tight text-[#1B1B1B]">
+            <h2 className="font-sans text-3xl md:text-5xl font-medium tracking-tight text-neutral-900">
               Interactive Operational Journey
             </h2>
-            <p className="font-jakarta text-[#6D6D6D] mt-4 font-light">
-              Each cycle has specific checks. Click any node below to trace a hauling unit's workflow as it processes from loading point to laboratory release.
+            <p className="font-sans text-neutral-500 mt-6 text-lg font-normal">
+              Each cycle has specific checks. Trace a hauling unit's workflow as it processes from loading point to laboratory release.
             </p>
           </div>
 
           {/* Timeline Visual Track */}
-          <div className="relative mb-16 pt-8 pb-12 font-jakarta">
+          <div className="relative mb-16 pt-8 pb-12 font-sans">
             {/* Horizontal line track */}
-            <div className="absolute top-1/2 left-0 right-0 h-1 bg-[#E4E4E4] -translate-y-1/2 rounded-full hidden md:block" />
+            <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-neutral-200 -translate-y-1/2 hidden md:block" />
 
             {/* Active progress indicator line */}
             <div
-              className="absolute top-1/2 left-0 h-1 bg-[#C67A2B] -translate-y-1/2 rounded-full hidden md:block transition-all duration-700 ease-out"
+              className="absolute top-1/2 left-0 h-[1px] bg-neutral-900 -translate-y-1/2 hidden md:block transition-all duration-700 ease-out"
               style={{ width: `${activeStage * 25}%` }}
             />
 
@@ -515,30 +522,30 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-4 relative z-10">
               {stages.map((stage, idx) => {
                 const isActive = idx === activeStage;
+                const isPassed = idx < activeStage;
                 return (
                   <button
                     key={idx}
                     onClick={() => setActiveStage(idx)}
-                    className={`flex flex-col items-center md:items-stretch text-left p-6 md:p-4 rounded-xl border transition-all duration-300 bg-white ${isActive
-                        ? "border-[#C67A2B] shadow-md ring-2 ring-[#C67A2B]/10 -translate-y-2"
-                        : "border-[#E4E4E4] hover:border-[#C67A2B]/50 hover:-translate-y-1"
-                      }`}
+                    className={`flex flex-col items-center md:items-stretch text-left p-6 md:p-4 transition-all duration-300 bg-white group ${
+                      isActive ? "opacity-100" : "opacity-50 hover:opacity-100"
+                    }`}
                   >
-                    <div className="flex items-center gap-3 md:flex-col md:items-start">
+                    <div className="flex items-center gap-4 md:flex-col md:items-start">
                       {/* Node status dot */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-colors ${isActive
-                          ? "bg-[#C67A2B] text-white"
-                          : idx < activeStage
-                            ? "bg-[#56694E] text-white"
-                            : "bg-neutral-200 text-[#6D6D6D]"
-                        }`}>
-                        {idx + 1}
-                      </div>
-                      <div className="md:mt-4">
-                        <h4 className="font-syne text-sm font-bold text-[#1B1B1B]">
+                      <div className={`w-3 h-3 rounded-full transition-colors ${
+                          isActive
+                            ? "bg-[#C67A2B] ring-4 ring-[#C67A2B]/20"
+                            : isPassed
+                              ? "bg-neutral-900"
+                              : "bg-neutral-300 group-hover:bg-neutral-400"
+                        }`} 
+                      />
+                      <div className="md:mt-6">
+                        <h4 className={`font-sans text-sm font-semibold transition-colors ${isActive ? "text-neutral-900" : "text-neutral-500"}`}>
                           {stage.title}
                         </h4>
-                        <p className="text-[9px] text-[#6D6D6D] tracking-widest uppercase font-semibold mt-0.5">
+                        <p className="text-[10px] text-neutral-400 tracking-widest uppercase font-medium mt-1">
                           {stage.subtitle}
                         </p>
                       </div>
@@ -547,39 +554,28 @@ export default function Home() {
                 );
               })}
             </div>
-
-            {/* Interactive animated truck simulator */}
-            <div className="hidden md:block relative h-8 mt-12 bg-white/40 border border-[#E4E4E4] rounded-full overflow-hidden">
-              <div
-                className="absolute top-1/2 -translate-y-1/2 flex items-center gap-2 text-[#C67A2B] font-bold text-xs uppercase transition-all duration-700 ease-out"
-                style={{ left: `calc(${activeStage * 23.5}% + 16px)` }}
-              >
-                <Truck className="w-5 h-5 animate-pulse" />
-                <span className="font-outfit tracking-wider text-[10px]">UNIT TRANSIT POSITION</span>
-              </div>
-            </div>
           </div>
 
           {/* Selected Stage Detail Panel */}
-          <div className="bg-white border border-[#E4E4E4] rounded-2xl p-8 md:p-12 shadow-sm font-jakarta transition-all duration-500 transform scale-100 flex flex-col md:flex-row md:items-center justify-between gap-8">
-            <div className="space-y-4 max-w-2xl">
-              <span className={`inline-block border px-3 py-1 rounded text-xs font-semibold ${stages[activeStage].bg}`}>
+          <div className="bg-neutral-50 rounded-none p-8 md:p-12 font-sans transition-all duration-500 flex flex-col md:flex-row md:items-start justify-between gap-12">
+            <div className="space-y-6 max-w-2xl">
+              <span className="inline-block text-[10px] uppercase tracking-widest font-semibold text-neutral-500">
                 STAGE 0{activeStage + 1} DIRECTIVES
               </span>
-              <h3 className="font-syne text-2xl md:text-3xl font-extrabold text-[#1B1B1B]">
+              <h3 className="font-sans text-2xl md:text-3xl font-medium text-neutral-900 tracking-tight">
                 {stages[activeStage].title} — {stages[activeStage].subtitle}
               </h3>
-              <p className="text-[#6D6D6D] leading-relaxed font-light">
+              <p className="text-neutral-600 leading-relaxed text-lg font-normal">
                 {stages[activeStage].description}
               </p>
-              <div className="flex flex-wrap gap-4 pt-2">
-                <div className="flex items-center gap-2 bg-[#F7F5F2] border border-[#E4E4E4] px-4 py-2 rounded-lg text-xs font-medium">
-                  <Clock className="w-4 h-4 text-[#C67A2B]" />
-                  {stages[activeStage].duration}
+              <div className="flex flex-wrap gap-6 pt-4 border-t border-neutral-200">
+                <div>
+                  <span className="block text-[10px] text-neutral-400 uppercase tracking-widest font-semibold mb-1">Duration</span>
+                  <span className="text-sm font-medium text-neutral-900">{stages[activeStage].duration}</span>
                 </div>
-                <div className="flex items-center gap-2 bg-[#F7F5F2] border border-[#E4E4E4] px-4 py-2 rounded-lg text-xs font-medium">
-                  <Shield className="w-4 h-4 text-[#56694E]" />
-                  {stages[activeStage].metric}
+                <div>
+                  <span className="block text-[10px] text-neutral-400 uppercase tracking-widest font-semibold mb-1">Metric</span>
+                  <span className="text-sm font-medium text-neutral-900">{stages[activeStage].metric}</span>
                 </div>
               </div>
             </div>
@@ -587,50 +583,50 @@ export default function Home() {
               <button
                 onClick={() => setActiveStage(prev => Math.max(0, prev - 1))}
                 disabled={activeStage === 0}
-                className="flex-1 md:flex-initial border border-[#E4E4E4] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-neutral-50 px-5 py-3 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 md:flex-initial border border-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 px-6 py-3 text-xs font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors text-neutral-900"
               >
-                <ChevronLeft className="w-4 h-4" /> Prev Stage
+                <ChevronLeft className="w-4 h-4" /> Prev
               </button>
               <button
                 onClick={() => setActiveStage(prev => Math.min(stages.length - 1, prev + 1))}
                 disabled={activeStage === stages.length - 1}
-                className="flex-1 md:flex-initial bg-[#1B1B1B] text-[#F7F5F2] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-neutral-800 px-5 py-3 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 md:flex-initial bg-neutral-900 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-800 px-6 py-3 text-xs font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors"
               >
-                Next Stage <ChevronRight className="w-4 h-4" />
+                Next <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         </section>
 
         {/* Fleet Showcase & Calculator Section */}
-        <section id="fleet" className="py-24 md:py-36 bg-[#F1EFEA] border-y border-[#E4E4E4] relative">
+        <section id="fleet" className="py-24 md:py-36 bg-white relative border-b border-neutral-100">
           <div className="max-w-7xl mx-auto px-6 md:px-12">
-            <div className="grid md:grid-cols-12 gap-12 items-end mb-16">
-              <div className="md:col-span-8">
-                <span className="font-outfit text-xs font-semibold uppercase tracking-[0.25em] text-[#C67A2B] mb-3 inline-block">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+              <div>
+                <span className="font-sans text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4 inline-block">
                   HEAVY POWERHOUSE
                 </span>
-                <h2 className="font-syne text-3xl md:text-5xl font-extrabold tracking-tight text-[#1B1B1B]">
+                <h2 className="font-sans text-3xl md:text-5xl font-medium tracking-tight text-neutral-900">
                   Engineered for Infinite Duty Cycles
                 </h2>
               </div>
-              <div className="md:col-span-4 flex md:justify-end">
+              <div className="flex">
                 {/* Fleet Spec Tabs */}
-                <div className="inline-flex bg-white/60 p-1.5 rounded-full border border-[#E4E4E4] gap-1">
+                <div className="inline-flex border-b border-neutral-200 w-full md:w-auto">
                   <button
                     onClick={() => setActiveFleet("volvo")}
-                    className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${activeFleet === "volvo"
-                        ? "bg-[#1B1B1B] text-white shadow"
-                        : "text-[#6D6D6D] hover:text-[#1B1B1B]"
+                    className={`px-8 py-4 text-xs font-semibold uppercase tracking-widest transition-all border-b-2 ${activeFleet === "volvo"
+                        ? "border-neutral-900 text-neutral-900"
+                        : "border-transparent text-neutral-400 hover:text-neutral-900"
                       }`}
                   >
                     Volvo FMX
                   </button>
                   <button
                     onClick={() => setActiveFleet("scania")}
-                    className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${activeFleet === "scania"
-                        ? "bg-[#1B1B1B] text-white shadow"
-                        : "text-[#6D6D6D] hover:text-[#1B1B1B]"
+                    className={`px-8 py-4 text-xs font-semibold uppercase tracking-widest transition-all border-b-2 ${activeFleet === "scania"
+                        ? "border-neutral-900 text-neutral-900"
+                        : "border-transparent text-neutral-400 hover:text-neutral-900"
                       }`}
                   >
                     Scania XT
@@ -639,46 +635,46 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid lg:grid-cols-12 gap-12">
+            <div className="grid lg:grid-cols-12 gap-16 md:gap-24">
               {/* Spec Panel */}
-              <div className="lg:col-span-7 bg-white border border-[#E4E4E4] rounded-2xl p-8 md:p-12 shadow-sm flex flex-col justify-between space-y-8 font-jakarta">
+              <div className="lg:col-span-7 flex flex-col justify-between font-sans">
                 <div>
-                  <span className="text-[#C67A2B] font-outfit text-xs font-bold uppercase tracking-widest">
+                  <span className="text-neutral-500 text-[10px] font-semibold uppercase tracking-widest">
                     {fleets[activeFleet].tagline}
                   </span>
-                  <h3 className="font-syne text-2xl md:text-3xl font-extrabold mt-1 text-[#1B1B1B]">
+                  <h3 className="text-3xl md:text-4xl font-medium mt-2 text-neutral-900 tracking-tight">
                     {fleets[activeFleet].name}
                   </h3>
-                  <p className="text-[#6D6D6D] text-sm mt-3 leading-relaxed font-light">
+                  <p className="text-neutral-500 text-lg mt-4 leading-relaxed font-normal">
                     {fleets[activeFleet].features}
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 border-t border-[#E4E4E4] pt-8">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-8 border-t border-neutral-200 pt-8 mt-12">
                   <div>
-                    <span className="text-[10px] text-[#6D6D6D] tracking-wider uppercase font-semibold">Engine Specs</span>
-                    <p className="text-sm font-bold text-[#1B1B1B] mt-1">{fleets[activeFleet].engine}</p>
+                    <span className="text-[10px] text-neutral-400 tracking-widest uppercase font-semibold">Engine Specs</span>
+                    <p className="text-sm font-medium text-neutral-900 mt-2">{fleets[activeFleet].engine}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#6D6D6D] tracking-wider uppercase font-semibold">Horsepower output</span>
-                    <p className="text-sm font-bold text-[#1B1B1B] mt-1">{fleets[activeFleet].power}</p>
+                    <span className="text-[10px] text-neutral-400 tracking-widest uppercase font-semibold">Horsepower output</span>
+                    <p className="text-sm font-medium text-neutral-900 mt-2">{fleets[activeFleet].power}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#6D6D6D] tracking-wider uppercase font-semibold">Payload Capacity</span>
-                    <p className="text-sm font-bold text-[#1B1B1B] mt-1">{fleets[activeFleet].payload}</p>
+                    <span className="text-[10px] text-neutral-400 tracking-widest uppercase font-semibold">Payload Capacity</span>
+                    <p className="text-sm font-medium text-neutral-900 mt-2">{fleets[activeFleet].payload}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#6D6D6D] tracking-wider uppercase font-semibold">Average Fuel Efficiency</span>
-                    <p className="text-sm font-bold text-[#1B1B1B] mt-1">{fleets[activeFleet].fuelAvg}</p>
+                    <span className="text-[10px] text-neutral-400 tracking-widest uppercase font-semibold">Average Fuel Efficiency</span>
+                    <p className="text-sm font-medium text-neutral-900 mt-2">{fleets[activeFleet].fuelAvg}</p>
                   </div>
                 </div>
 
-                <div className="space-y-3 bg-[#F7F5F2] border border-[#E4E4E4] p-5 rounded-xl">
-                  <span className="text-[10px] text-[#6D6D6D] tracking-wider uppercase font-bold">Standard Features</span>
-                  <ul className="space-y-1.5 text-xs text-[#1B1B1B] font-medium">
+                <div className="mt-12 pt-8 border-t border-neutral-200">
+                  <span className="text-[10px] text-neutral-400 tracking-widest uppercase font-semibold mb-4 block">Standard Features</span>
+                  <ul className="space-y-3 text-sm text-neutral-600 font-normal">
                     {fleets[activeFleet].highlights.map((h, i) => (
-                      <li key={i} className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#56694E]" />
+                      <li key={i} className="flex items-start gap-3">
+                        <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 mt-1.5 shrink-0" />
                         {h}
                       </li>
                     ))}
@@ -687,25 +683,25 @@ export default function Home() {
               </div>
 
               {/* Interactive Rent Calculator */}
-              <div className="lg:col-span-5 bg-white border border-[#E4E4E4] rounded-2xl p-8 md:p-12 shadow-sm space-y-8 font-jakarta">
+              <div className="lg:col-span-5 bg-neutral-50 p-8 md:p-12 space-y-10 font-sans border border-neutral-100">
                 <div>
-                  <span className="text-[#56694E] font-outfit text-xs font-bold uppercase tracking-widest">
+                  <span className="text-neutral-400 text-[10px] font-semibold uppercase tracking-widest">
                     FLEXIBLE LEASE CALCULATOR
                   </span>
-                  <h3 className="font-syne text-2xl font-bold mt-1 text-[#1B1B1B]">
+                  <h3 className="text-2xl font-medium mt-2 text-neutral-900 tracking-tight">
                     Estimate Leasing Costs
                   </h3>
-                  <p className="text-[#6D6D6D] text-xs mt-2 leading-relaxed">
+                  <p className="text-neutral-500 text-sm mt-3 leading-relaxed">
                     Project your operation budget. Rental pricing is scaled to contract length. Discounts apply for long-term commitments.
                   </p>
                 </div>
 
                 {/* Input details */}
-                <div className="space-y-6 pt-4">
+                <div className="space-y-8 pt-4 border-t border-neutral-200">
                   <div>
-                    <div className="flex justify-between items-center text-xs font-semibold mb-2">
-                      <span className="text-[#6D6D6D]">Lease Period (Months)</span>
-                      <span className="text-[#1B1B1B] bg-neutral-100 px-2.5 py-1 rounded">{months} Months</span>
+                    <div className="flex justify-between items-center text-xs font-semibold mb-6">
+                      <span className="text-neutral-500 uppercase tracking-widest">Lease Period</span>
+                      <span className="text-neutral-900">{months} Months</span>
                     </div>
                     <input
                       type="range"
@@ -714,34 +710,33 @@ export default function Home() {
                       step="3"
                       value={months}
                       onChange={(e) => setMonths(parseInt(e.target.value))}
-                      className="w-full h-1 bg-[#E4E4E4] rounded-lg appearance-none cursor-pointer accent-[#C67A2B]"
+                      className="w-full h-[1px] bg-neutral-300 rounded-none appearance-none cursor-pointer accent-neutral-900"
                     />
-                    <div className="flex justify-between text-[10px] text-[#6D6D6D] mt-1.5 font-semibold">
+                    <div className="flex justify-between text-[10px] text-neutral-400 mt-3 font-semibold tracking-widest uppercase">
                       <span>3m</span>
-                      <span>12m (5% Disc)</span>
-                      <span>18m (8% Disc)</span>
-                      <span>24m+ (12% Disc)</span>
+                      <span>12m</span>
+                      <span>18m</span>
+                      <span>24m+</span>
                     </div>
                   </div>
 
-                  <div className="border-t border-[#E4E4E4] pt-6 space-y-4">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-xs text-[#6D6D6D] font-medium">Monthly Rent Spec</span>
-                      <span className="font-syne text-lg font-bold text-[#1B1B1B]">
+                  <div className="pt-4 space-y-6">
+                    <div className="flex justify-between items-baseline border-b border-neutral-200 pb-4">
+                      <span className="text-xs text-neutral-500 font-medium uppercase tracking-widest">Monthly Rent Spec</span>
+                      <span className="font-sans text-lg font-semibold text-neutral-900 tabular-nums">
                         Rp {currentRent.monthly.toLocaleString("id-ID")}
-                        <span className="text-[10px] text-[#6D6D6D] font-normal"> / month</span>
                       </span>
                     </div>
-                    <div className="flex justify-between items-baseline bg-[#F7F5F2] border border-[#E4E4E4] p-4 rounded-xl">
-                      <span className="text-xs text-[#6D6D6D] font-medium">Estimated Total Rental</span>
-                      <span className="font-syne text-xl font-extrabold text-[#C67A2B]">
+                    <div className="flex justify-between items-baseline pt-2">
+                      <span className="text-xs text-neutral-500 font-medium uppercase tracking-widest">Estimated Total</span>
+                      <span className="font-sans text-2xl font-semibold text-[#C67A2B] tabular-nums tracking-tight">
                         Rp {currentRent.total.toLocaleString("id-ID")}
                       </span>
                     </div>
                   </div>
 
-                  <div className="text-[10px] text-[#6D6D6D] leading-relaxed flex gap-2 pt-2">
-                    <Wrench className="w-4 h-4 shrink-0 text-[#C67A2B]" />
+                  <div className="text-[10px] text-neutral-400 leading-relaxed flex gap-3 pt-6 border-t border-neutral-200">
+                    <Wrench className="w-4 h-4 shrink-0" />
                     <span>Lease includes scheduled preventive mine site maintenance, spare parts, and mandatory unit compliance certifications.</span>
                   </div>
                 </div>
@@ -751,94 +746,90 @@ export default function Home() {
         </section>
 
         {/* Performance & Analytics: Dark Dashboard Section */}
-        <section id="performance" className="py-24 md:py-36 bg-[#121212] text-gray-100 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(198,122,43,0.06),transparent_50%)] pointer-events-none" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(86,105,78,0.05),transparent_50%)] pointer-events-none" />
-
+        <section id="performance" className="py-24 md:py-36 bg-[#0a0a0a] text-white relative border-y border-neutral-900">
           <div className="max-w-7xl mx-auto px-6 md:px-12">
-            <div className="grid lg:grid-cols-12 gap-12 items-center">
+            <div className="grid lg:grid-cols-12 gap-16 md:gap-24 items-center">
               {/* Details panel */}
-              <div className="lg:col-span-5 space-y-6">
-                <span className="font-outfit text-xs font-bold uppercase tracking-[0.25em] text-[#C67A2B] bg-[#C67A2B]/15 px-3 py-1.5 rounded">
+              <div className="lg:col-span-5 space-y-10">
+                <span className="font-sans text-xs font-semibold uppercase tracking-widest text-neutral-500">
                   LIVE PERFORMANCE METRICS
                 </span>
-                <h2 className="font-syne text-3xl md:text-5xl font-extrabold tracking-tight leading-[1.1]">
+                <h2 className="font-sans text-3xl md:text-5xl font-medium tracking-tight leading-[1.1]">
                   Real-Time Auditing & Yields
                 </h2>
-                <p className="font-jakarta text-gray-400 font-light leading-relaxed">
+                <p className="font-sans text-neutral-400 font-normal leading-relaxed text-lg">
                   We manage contract performance under a centralized dashboard. Track operational parameters, calculate hauling cycles, measure fuel usage, and keep budgets completely matching the contract target.
                 </p>
 
-                <div className="space-y-4 pt-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-[#C67A2B]">
-                      <Gauge className="w-5 h-5" />
+                <div className="space-y-8 pt-6 border-t border-neutral-800">
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full border border-neutral-700 flex items-center justify-center shrink-0">
+                      <Gauge className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-syne text-sm font-bold">Total Operations Telemetry</h4>
-                      <p className="text-xs text-gray-400">All haul trucks connected via GPS/IoT payload monitors</p>
+                      <h4 className="font-sans text-base font-medium">Total Operations Telemetry</h4>
+                      <p className="text-sm text-neutral-500 mt-1">All haul trucks connected via GPS/IoT payload monitors</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-[#56694E]">
-                      <TrendingUp className="w-5 h-5" />
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full border border-neutral-700 flex items-center justify-center shrink-0">
+                      <TrendingUp className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-syne text-sm font-bold">Live Budget Tracking</h4>
-                      <p className="text-xs text-gray-400">Instantly matches fuel, driver payroll, and rental costs</p>
+                      <h4 className="font-sans text-base font-medium">Live Budget Tracking</h4>
+                      <p className="text-sm text-neutral-500 mt-1">Instantly matches fuel, driver payroll, and rental costs</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Dark Console Widget */}
-              <div className="lg:col-span-7 bg-[#1B1B1B] border border-neutral-800 rounded-3xl p-6 md:p-10 shadow-2xl relative">
-                <div className="flex items-center justify-between border-b border-neutral-800 pb-5 mb-8">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-red-500" />
-                    <span className="w-3 h-3 rounded-full bg-yellow-500" />
-                    <span className="w-3 h-3 rounded-full bg-green-500" />
-                    <span className="text-[10px] text-gray-500 font-mono ml-2">HMS://HKJ.CONSOLE-FEED</span>
+              <div className="lg:col-span-7 bg-black border border-neutral-800 rounded-lg p-8 md:p-12 shadow-2xl relative">
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-6 mb-10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-neutral-600" />
+                    <span className="text-[10px] text-neutral-500 font-mono tracking-widest uppercase">Console Feed</span>
                   </div>
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] px-2.5 py-0.5 rounded-full font-mono animate-pulse">
-                    SYSTEM ACTIVE
+                  <div className="flex items-center gap-2 text-neutral-400 text-[10px] font-mono tracking-widest uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    System Active
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-8 font-jakarta">
+                <div className="grid grid-cols-2 gap-x-12 gap-y-12 font-sans">
                   <div className="border-b border-neutral-800 pb-6">
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block">Total Nickel Ore Hauled</span>
-                    <div className="font-syne text-3xl font-extrabold mt-1.5 text-white">
-                      <Counter end={12450800} suffix=" Tons" />
+                    <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold block">Total Nickel Ore Hauled</span>
+                    <div className="text-3xl font-medium mt-2 text-white tabular-nums tracking-tight">
+                      <Counter end={12450800} suffix=" T" />
                     </div>
                   </div>
                   <div className="border-b border-neutral-800 pb-6">
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block">Active Operational Contracts</span>
-                    <div className="font-syne text-3xl font-extrabold mt-1.5 text-white">
-                      <Counter end={2} suffix=" Contracts" />
+                    <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold block">Active Operational Contracts</span>
+                    <div className="text-3xl font-medium mt-2 text-white tabular-nums tracking-tight">
+                      <Counter end={2} />
                     </div>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block">Average Haul Cycle Time</span>
-                    <div className="font-syne text-3xl font-extrabold mt-1.5 text-[#C67A2B]">
-                      <Counter end={38} suffix=" Min" />
+                    <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold block">Average Haul Cycle Time</span>
+                    <div className="text-3xl font-medium mt-2 text-white tabular-nums tracking-tight">
+                      <Counter end={38} suffix=" M" />
                     </div>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block">Contract Target Margin</span>
-                    <div className="font-syne text-3xl font-extrabold mt-1.5 text-[#56694E]">
+                    <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold block">Contract Target Margin</span>
+                    <div className="text-3xl font-medium mt-2 text-[#C67A2B] tabular-nums tracking-tight">
                       <Counter end={30} suffix="%" />
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-neutral-800 flex items-center justify-between text-xs text-gray-400">
-                  <span>Update rate: Real-time via Weighbridge</span>
+                <div className="mt-12 pt-6 border-t border-neutral-800 flex items-center justify-between text-xs text-neutral-500">
+                  <span className="font-mono text-[10px]">SYNC: WEIGHBRIDGE_LIVE</span>
                   <Link
                     href="/dashboard"
-                    className="text-white hover:text-[#C67A2B] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+                    className="text-white hover:text-neutral-300 font-semibold uppercase tracking-widest flex items-center gap-2 transition-colors"
                   >
-                    Inspect Live Reports
+                    Live Reports
                     <ChevronRight className="w-4 h-4" />
                   </Link>
                 </div>
@@ -849,47 +840,47 @@ export default function Home() {
 
         {/* Innovation / Why Choose Us Section */}
         <section id="innovation" className="py-24 md:py-36 max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid lg:grid-cols-12 gap-12">
-            <div className="lg:col-span-4 space-y-6">
-              <span className="font-outfit text-xs font-semibold uppercase tracking-[0.25em] text-[#C67A2B]">
+          <div className="grid lg:grid-cols-12 gap-16 md:gap-24">
+            <div className="lg:col-span-4 space-y-8">
+              <span className="font-sans text-xs font-semibold uppercase tracking-widest text-neutral-400">
                 NEXT-GEN INFRASTRUCTURE
               </span>
-              <h2 className="font-syne text-3xl md:text-4xl font-extrabold tracking-tight text-[#1B1B1B] leading-none">
+              <h2 className="font-sans text-3xl md:text-4xl font-medium tracking-tight text-neutral-900 leading-tight">
                 Safety, Electrification, Telemetry.
               </h2>
-              <p className="font-jakarta text-[#6D6D6D] text-sm leading-relaxed font-light">
+              <p className="font-sans text-neutral-500 text-lg leading-relaxed font-normal">
                 We continually upgrade our mining fleet and technical stack. Incorporating advanced security and monitoring layers.
               </p>
             </div>
 
-            <div className="lg:col-span-8 grid md:grid-cols-3 gap-6 font-jakarta">
-              <div className="bg-white border border-[#E4E4E4] p-8 rounded-2xl flex flex-col justify-between h-72 hover:border-[#C67A2B]/40 transition-colors">
-                <div className="w-12 h-12 bg-[#C67A2B]/10 rounded-xl flex items-center justify-center text-[#C67A2B]">
-                  <Database className="w-6 h-6" />
+            <div className="lg:col-span-8 grid md:grid-cols-3 gap-6 font-sans">
+              <div className="bg-white border border-neutral-200 p-8 flex flex-col justify-between h-72 hover:border-neutral-900 transition-colors group">
+                <div className="w-10 h-10 border border-neutral-200 rounded-full flex items-center justify-center text-neutral-900 group-hover:bg-neutral-900 group-hover:text-white transition-colors">
+                  <Database className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="font-syne font-bold text-lg text-[#1B1B1B]">IoT Payload Verification</h4>
-                  <p className="text-xs text-[#6D6D6D] mt-2 font-light">Digital integration with weighbridge systems prevents manual tampering or tonase leakages.</p>
+                  <h4 className="font-semibold text-base text-neutral-900">IoT Payload Verification</h4>
+                  <p className="text-sm text-neutral-500 mt-3 font-normal leading-relaxed">Digital integration with weighbridge systems prevents manual tampering or tonase leakages.</p>
                 </div>
               </div>
 
-              <div className="bg-white border border-[#E4E4E4] p-8 rounded-2xl flex flex-col justify-between h-72 hover:border-[#56694E]/40 transition-colors">
-                <div className="w-12 h-12 bg-[#56694E]/10 rounded-xl flex items-center justify-center text-[#56694E]">
-                  <Cpu className="w-6 h-6" />
+              <div className="bg-white border border-neutral-200 p-8 flex flex-col justify-between h-72 hover:border-neutral-900 transition-colors group">
+                <div className="w-10 h-10 border border-neutral-200 rounded-full flex items-center justify-center text-neutral-900 group-hover:bg-neutral-900 group-hover:text-white transition-colors">
+                  <Cpu className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="font-syne font-bold text-lg text-[#1B1B1B]">Route Speed Auditing</h4>
-                  <p className="text-xs text-[#6D6D6D] mt-2 font-light">Continuous GPS reporting tracks vehicle velocities dynamically to eliminate transit accidents.</p>
+                  <h4 className="font-semibold text-base text-neutral-900">Route Speed Auditing</h4>
+                  <p className="text-sm text-neutral-500 mt-3 font-normal leading-relaxed">Continuous GPS reporting tracks vehicle velocities dynamically to eliminate transit accidents.</p>
                 </div>
               </div>
 
-              <div className="bg-white border border-[#E4E4E4] p-8 rounded-2xl flex flex-col justify-between h-72 hover:border-[#C67A2B]/40 transition-colors">
-                <div className="w-12 h-12 bg-[#C67A2B]/10 rounded-xl flex items-center justify-center text-[#C67A2B]">
-                  <BatteryCharging className="w-6 h-6" />
+              <div className="bg-white border border-neutral-200 p-8 flex flex-col justify-between h-72 hover:border-neutral-900 transition-colors group">
+                <div className="w-10 h-10 border border-neutral-200 rounded-full flex items-center justify-center text-neutral-900 group-hover:bg-neutral-900 group-hover:text-white transition-colors">
+                  <BatteryCharging className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="font-syne font-bold text-lg text-[#1B1B1B]">Electrification Roadmaps</h4>
-                  <p className="text-xs text-[#6D6D6D] mt-2 font-light">Actively testing heavy-duty electric trucks to minimize carbon impact on Indonesian mine sites.</p>
+                  <h4 className="font-semibold text-base text-neutral-900">Electrification Roadmaps</h4>
+                  <p className="text-sm text-neutral-500 mt-3 font-normal leading-relaxed">Actively testing heavy-duty electric trucks to minimize carbon impact on Indonesian mine sites.</p>
                 </div>
               </div>
             </div>

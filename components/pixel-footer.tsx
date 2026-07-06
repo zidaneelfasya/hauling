@@ -117,8 +117,6 @@ const PARTICLE_VS = `
     float size = 1.0;
     
     if (t > 0.0) {
-      alpha = 1.0 - t;
-      
       // Vertical translation (rising upwards)
       float riseSpeed = 0.4 + a_random.y * 0.4;
       if (a_random.z >= 0.70 && a_random.z < 0.90) {
@@ -139,19 +137,32 @@ const PARTICLE_VS = `
         x += cos(t * 4.0 + a_random.x * 6.28) * 0.02 * t;
       }
       
-      // Sizing based on type (70% pixel, 20% dust, 10% debris)
+      // Sizing and Base Alpha based on type
       if (a_random.z < 0.70) {
         // Pixel: 1-3px
         size = 1.0 + hash(a_random.x) * 2.0;
+        alpha = 1.0;
       } else if (a_random.z < 0.90) {
         // Dust: 0.5-1.0px (fades quicker)
         size = 0.5 + hash(a_random.x) * 0.5;
-        alpha = (1.0 - t) * 0.75;
+        alpha = 0.75;
       } else {
         // Debris: 1.5-3.0px (fades slower)
         size = 1.5 + hash(a_random.x) * 1.5;
-        alpha = (1.0 - t) * 0.45;
+        alpha = 0.45;
       }
+      
+      // 1. Organic disappearance at the top 1/5 of the screen (y > 0.6)
+      // Using the exact same noise 'n' to make the disappear edge organic and matching the disassembly
+      // 'n' is roughly 0.0 to 0.6. This maps the start of fading to y = 0.4 to 0.7
+      float disappearStart = 0.4 + (n * 0.5); 
+      if (y > disappearStart) {
+        float fade = (y - disappearStart) / 0.3; // Fades out over 0.3 units of y
+        alpha *= clamp(1.0 - fade, 0.0, 1.0);
+      }
+      
+      // 2. Lifespan fallback (fade out at the very end of 't' if not already disappeared)
+      alpha *= clamp(2.0 - t * 2.0, 0.0, 1.0);
     }
     
     gl_Position = vec4(x, y, 0.0, 1.0);
@@ -203,13 +214,13 @@ function createProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: st
   const vs = compileShader(gl, vsSource, gl.VERTEX_SHADER);
   const fs = compileShader(gl, fsSource, gl.FRAGMENT_SHADER);
   if (!vs || !fs) return null;
-  
+
   const program = gl.createProgram();
   if (!program) return null;
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
   gl.linkProgram(program);
-  
+
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error("Program link error:", gl.getProgramInfoLog(program));
     gl.deleteProgram(program);
@@ -228,9 +239,9 @@ export default function PixelFooter() {
     const canvas = canvasRef.current;
     const wrapper = footerRef.current;
     if (!canvas || !wrapper) return;
-    
-    const gl = canvas.getContext("webgl", { alpha: true, antialias: true }) || 
-               canvas.getContext("experimental-webgl", { alpha: true, antialias: true }) as WebGLRenderingContext | null;
+
+    const gl = canvas.getContext("webgl", { alpha: true, antialias: true }) ||
+      canvas.getContext("experimental-webgl", { alpha: true, antialias: true }) as WebGLRenderingContext | null;
     if (!gl) {
       console.error("WebGL not supported in this browser.");
       return;
@@ -246,7 +257,7 @@ export default function PixelFooter() {
     img.src = "/footer-image.png";
     let imageLoaded = false;
     let particlesCount = 0;
-    
+
     // Create buffers
     const quadBuffer = gl.createBuffer();
     const particleBuffer = gl.createBuffer();
@@ -256,11 +267,11 @@ export default function PixelFooter() {
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
     const quadVertices = new Float32Array([
       -1, -1,
-       1, -1,
-      -1,  1,
-      -1,  1,
-       1, -1,
-       1,  1,
+      1, -1,
+      -1, 1,
+      -1, 1,
+      1, -1,
+      1, 1,
     ]);
     gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
 
@@ -283,7 +294,7 @@ export default function PixelFooter() {
       const imgH = img.naturalHeight;
       const imageRatio = imgW / imgH;
       let sX = 0, sY = 0, sW = imgW, sH = imgH;
-      
+
       if (imageRatio > canvasRatio) {
         sW = imgH * canvasRatio;
         sX = (imgW - sW) / 2;
@@ -295,7 +306,7 @@ export default function PixelFooter() {
       // Sample grid resolution: 400x300 (gives ~30,000 active particles)
       const sampleW = 400;
       const sampleH = 300;
-      
+
       const offscreen = document.createElement("canvas");
       offscreen.width = sampleW;
       offscreen.height = sampleH;
@@ -309,7 +320,7 @@ export default function PixelFooter() {
 
       // Top 45% height in sampled grid (matches shader dissolution zone)
       const topThirdHeight = Math.floor(sampleH * 0.45);
-      
+
       // Setup raw interleaved array buffer data
       // For each particle: [nx, ny, seed, speedScale, type, r, g, b] (8 floats = 32 bytes)
       const tempArray: number[] = [];
@@ -323,7 +334,7 @@ export default function PixelFooter() {
           const a = data[idx + 3];
 
           if (a < 50) continue;
-          
+
           // Skip bright pixels (the white sky)
           const brightness = (r + g + b) / 3;
           if (brightness > 240) continue;
@@ -333,7 +344,7 @@ export default function PixelFooter() {
           const seed = Math.random() * 100;
           const speedScale = 0.5 + Math.random() * 1.5;
           let type = 0.0; // 70% pixels (type < 0.70)
-          
+
           if (rand >= 0.70 && rand < 0.90) {
             type = 0.80; // 20% fine dust
           } else if (rand >= 0.90) {
@@ -355,7 +366,7 @@ export default function PixelFooter() {
       }
 
       particlesCount = tempArray.length / 8;
-      
+
       // Upload particle data to GPU
       gl.bindBuffer(gl.ARRAY_BUFFER, particleBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tempArray), gl.STATIC_DRAW);
@@ -378,7 +389,7 @@ export default function PixelFooter() {
       canvas.height = rect.height * dpr;
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
-      
+
       if (imageLoaded) {
         initParticles();
       }
@@ -409,13 +420,13 @@ export default function PixelFooter() {
         targetProgress = Math.max(0, Math.min(0.65, targetProgress));
       }
       // Phase 1: rect.top > 0 means footer hasn't reached top yet, no animation
-      
+
       targetProgressRef.current = targetProgress;
     };
 
     window.addEventListener("resize", resizeCanvas);
     window.addEventListener("scroll", handleScroll, { passive: true });
-    
+
     resizeCanvas();
     handleScroll();
 
@@ -453,24 +464,24 @@ export default function PixelFooter() {
         // 2. Render particle layers
         if (progress > 0.001 && particlesCount > 0) {
           gl.useProgram(particleProgram);
-          
+
           gl.bindBuffer(gl.ARRAY_BUFFER, particleBuffer);
-          
+
           const pPos = gl.getAttribLocation(particleProgram, "a_position");
           const pRand = gl.getAttribLocation(particleProgram, "a_random");
           const pCol = gl.getAttribLocation(particleProgram, "a_color");
-          
+
           gl.enableVertexAttribArray(pPos);
           gl.vertexAttribPointer(pPos, 2, gl.FLOAT, false, 32, 0); // 32 bytes stride, 0 offset
-          
+
           gl.enableVertexAttribArray(pRand);
           gl.vertexAttribPointer(pRand, 3, gl.FLOAT, false, 32, 8); // 8 bytes offset
-          
+
           gl.enableVertexAttribArray(pCol);
           gl.vertexAttribPointer(pCol, 3, gl.FLOAT, false, 32, 20); // 20 bytes offset
-          
+
           gl.uniform1f(gl.getUniformLocation(particleProgram, "u_progress"), progress);
-          
+
           gl.drawArrays(gl.POINTS, 0, particlesCount);
         }
       }
@@ -484,7 +495,7 @@ export default function PixelFooter() {
       window.removeEventListener("resize", resizeCanvas);
       window.removeEventListener("scroll", handleScroll);
       cancelAnimationFrame(animationFrameId);
-      
+
       // Clean up GPU buffers & programs
       gl.deleteBuffer(quadBuffer);
       gl.deleteBuffer(particleBuffer);
@@ -502,7 +513,7 @@ export default function PixelFooter() {
     >
       {/* Sticky Inner Footer Container - pins to top of viewport */}
       <div className="sticky top-0 w-full h-screen overflow-hidden flex flex-col justify-between font-jakarta p-8 md:p-20 text-[#F7F5F2]">
-        
+
         {/* WebGL Canvas Background */}
         <div className="absolute inset-0 -z-10 bg-[#F7F5F2]">
           <canvas ref={canvasRef} className="block w-full h-full" />
@@ -510,30 +521,30 @@ export default function PixelFooter() {
 
         {/* Minimalist White Footer Content Overlay */}
         {/* Glow effect wrapping layer with extremely faint radial glow behind typography */}
-        <div 
+        <div
           className="relative z-10 max-w-7xl mx-auto w-full h-full flex flex-col justify-between pt-[32vh] pb-4 pointer-events-auto"
           style={{
             background: "radial-gradient(circle at 30% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 60%)"
           }}
         >
-          
+
           {/* Main Footer Row */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-            
+
             {/* Left Column: Title and CTA */}
             <div className="md:col-span-6 space-y-4 md:space-y-6">
               <span className="font-outfit text-xs font-bold uppercase tracking-[0.3em] text-[#C67A2B] bg-[#C67A2B]/10 px-3 py-1.5 rounded inline-block">
                 Partnership Inquiries
               </span>
-              <h2 className="font-syne text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tighter leading-[0.95] text-white">
-                OPTIMIZE LOGISTICS.<br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C67A2B] to-[#56694E]">
+              <h2 className="font-outfit text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tighter leading-[0.95] text-white">
+                MINING LOGISTICS<br />
+                {/* <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C67A2B] to-[#56694E]">
                   SHAPE THE FUTURE.
-                </span>
+                </span> */}
               </h2>
-              <p className="text-neutral-400 font-light text-xs md:text-sm max-w-md leading-relaxed">
+              {/* <p className="text-neutral-400 font-light text-xs md:text-sm max-w-md leading-relaxed">
                 Leverage our telemetry-linked heavy fleet and complete hauling audit systems to hit your monthly yield targets securely.
-              </p>
+              </p> */}
               <Link
                 href="/dashboard"
                 className="bg-white text-[#1B1B1B] hover:bg-[#C67A2B] hover:text-white text-xs font-bold uppercase tracking-widest px-6 py-4 rounded-full transition-all duration-300 flex items-center gap-3 shadow-lg group inline-flex"
@@ -544,7 +555,7 @@ export default function PixelFooter() {
             </div>
 
             {/* Right Column: Address details */}
-            <div className="md:col-span-6 grid grid-cols-2 gap-6 text-[10px] md:text-[11px] text-neutral-400 font-jakarta md:justify-items-end">
+            {/* <div className="md:col-span-6 grid grid-cols-2 gap-6 text-[10px] md:text-[11px] text-neutral-400 font-jakarta md:justify-items-end">
               <div className="space-y-2 md:max-w-[200px]">
                 <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest block">Corporate Office</span>
                 <p className="leading-relaxed">Jl. Tambang Lestari Blok A4, Jakarta, Indonesia</p>
@@ -553,22 +564,22 @@ export default function PixelFooter() {
                 <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest block">Site Operations</span>
                 <p className="leading-relaxed">Kolonodale & Sorowako Operations, Sulawesi, Indonesia</p>
               </div>
-            </div>
-            
+            </div> */}
+
           </div>
 
           {/* Bottom Row: Branding, social media, and legal */}
-          <div className="border-t border-neutral-800/80 pt-8 pb-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 text-[10px] md:text-[11px] text-neutral-400">
-            
+          <div className=" pt-8 pb-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 text-[10px] md:text-[11px] text-neutral-400">
+
             {/* Branding */}
             <div className="space-y-1">
               <h3 className="font-syne text-sm font-bold tracking-tight text-white uppercase leading-none">
                 PT HAULING KEMBAR JAYA
               </h3>
-              <p className="text-[9px] text-neutral-500 uppercase tracking-wider">
+              <p className="text-[9px] text-white uppercase tracking-wider">
                 Heavy Operations & Mining Logistics Services
               </p>
-              <span className="block text-[9px] text-neutral-600 font-mono">
+              <span className="block text-[9px] text-white font-mono">
                 © {new Date().getFullYear()} — Indonesia. All rights reserved.
               </span>
             </div>
@@ -582,7 +593,7 @@ export default function PixelFooter() {
                 <span>•</span>
                 <a href="/dashboard" className="hover:text-white transition-colors font-bold text-[#C67A2B]">System Portal</a>
               </div>
-              <div className="text-[9px] text-neutral-600 font-mono">
+              <div className="text-[9px] text-white font-mono">
                 HMS://HKJ.OPERATIONS-CONTROL
               </div>
             </div>

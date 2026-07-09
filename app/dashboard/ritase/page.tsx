@@ -447,7 +447,7 @@ export default function RitasePage() {
       
       const zip = new JSZip();
       
-      for (const [dateStr, records] of Object.entries(groupedByDate)) {
+      for (const [dateStr, records] of Object.entries(groupedByDate) as [string, any[]][]) {
         const doc = new jsPDF("landscape", "pt", "a4");
         
         // --- DRAW HEADER ---

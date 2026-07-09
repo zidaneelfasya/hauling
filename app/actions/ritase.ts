@@ -72,6 +72,10 @@ export async function createRitase(formData: {
   jenis_pengiriman: string;
   volume_bbm: number;
   harga_per_liter_bbm: number;
+  km_awal?: number;
+  km_akhir?: number;
+  hm_awal?: number;
+  hm_akhir?: number;
   keterangan_tarif?: string;
   status?: "Draft" | "Approved" | "Rejected";
 }) {
@@ -102,6 +106,10 @@ export async function createRitase(formData: {
     tarif_per_ritase: formData.tarif_per_ritase,
     jenis_pengiriman: formData.jenis_pengiriman,
     biaya_bbm,
+    km_awal: formData.km_awal || null,
+    km_akhir: formData.km_akhir || null,
+    hm_awal: formData.hm_awal || null,
+    hm_akhir: formData.hm_akhir || null,
     keterangan_tarif: formData.keterangan_tarif || null,
     status: finalStatus,
   };
@@ -149,6 +157,10 @@ export async function updateRitase(
     jenis_pengiriman: string;
     volume_bbm: number;
     harga_per_liter_bbm: number;
+    km_awal?: number;
+    km_akhir?: number;
+    hm_awal?: number;
+    hm_akhir?: number;
     keterangan_tarif?: string;
     status?: "Draft" | "Approved" | "Rejected";
   }
@@ -188,6 +200,10 @@ export async function updateRitase(
     tarif_per_ritase: formData.tarif_per_ritase,
     jenis_pengiriman: formData.jenis_pengiriman,
     biaya_bbm,
+    km_awal: formData.km_awal || null,
+    km_akhir: formData.km_akhir || null,
+    hm_awal: formData.hm_awal || null,
+    hm_akhir: formData.hm_akhir || null,
     keterangan_tarif: formData.keterangan_tarif || null,
     status: formData.status || existing.status,
   };

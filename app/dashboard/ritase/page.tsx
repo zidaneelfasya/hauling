@@ -43,7 +43,14 @@ import {
   SelectContent,
   SelectItem
 } from "@/components/ui/select";
-import { Plus, Search, Edit2, Trash2, Loader2, Check, X, AlertCircle, Clock, Truck, User, Fuel, FileText } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
+import { Plus, Search, Edit2, Trash2, Loader2, Check, X, AlertCircle, Clock, Truck, User, Fuel, FileText, MoreHorizontal, Info, Download } from "lucide-react";
 
 export default function RitasePage() {
   const queryClient = useQueryClient();
@@ -58,6 +65,10 @@ export default function RitasePage() {
 
   // Modals state
   const [isOpen, setIsOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [exportEndDate, setExportEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isExporting, setIsExporting] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [editRitase, setEditRitase] = useState<any>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
@@ -80,6 +91,10 @@ export default function RitasePage() {
   const [jenisPengiriman, setJenisPengiriman] = useState("Pit ke tongkang");
   const [volumeBbm, setVolumeBbm] = useState<string>("0");
   const [hargaPerLiterBbm, setHargaPerLiterBbm] = useState<string>("13500");
+  const [kmAwal, setKmAwal] = useState<string>("");
+  const [kmAkhir, setKmAkhir] = useState<string>("");
+  const [hmAwal, setHmAwal] = useState<string>("");
+  const [hmAkhir, setHmAkhir] = useState<string>("");
 
   // Fetch Session Profile Client-Side
   useEffect(() => {
@@ -251,6 +266,10 @@ export default function RitasePage() {
     setJenisPengiriman("Pit ke tongkang");
     setVolumeBbm("0");
     setHargaPerLiterBbm("13500");
+    setKmAwal("");
+    setKmAkhir("");
+    setHmAwal("");
+    setHmAkhir("");
     setIsOpen(true);
   };
 
@@ -267,10 +286,14 @@ export default function RitasePage() {
     setTarifPerRitase(String(r.tarif_per_ritase));
     setKeteranganTarif(r.keterangan_tarif || "");
     setJenisPengiriman(r.jenis_pengiriman || "Pit ke tongkang");
-    
+
     const bbmRecord = r.bbm?.[0] || null;
     setVolumeBbm(bbmRecord ? String(bbmRecord.liter) : "0");
     setHargaPerLiterBbm(bbmRecord ? String(bbmRecord.harga_per_liter) : "13500");
+    setKmAwal(r.km_awal != null ? String(r.km_awal) : "");
+    setKmAkhir(r.km_akhir != null ? String(r.km_akhir) : "");
+    setHmAwal(r.hm_awal != null ? String(r.hm_awal) : "");
+    setHmAkhir(r.hm_akhir != null ? String(r.hm_akhir) : "");
     setIsOpen(true);
   };
 
@@ -298,6 +321,10 @@ export default function RitasePage() {
       jenis_pengiriman: jenisPengiriman,
       volume_bbm: Number(volumeBbm),
       harga_per_liter_bbm: Number(hargaPerLiterBbm),
+      km_awal: kmAwal ? Number(kmAwal) : undefined,
+      km_akhir: kmAkhir ? Number(kmAkhir) : undefined,
+      hm_awal: hmAwal ? Number(hmAwal) : undefined,
+      hm_akhir: hmAkhir ? Number(hmAkhir) : undefined,
       keterangan_tarif: keteranganTarif,
     };
 
@@ -364,6 +391,262 @@ export default function RitasePage() {
     }
   };
 
+  const handleExportRange = async () => {
+    try {
+      setIsExporting(true);
+      if (!exportStartDate || !exportEndDate) {
+        toast({ title: "Error", description: "Pilih tanggal mulai dan akhir", type: "error" });
+        return;
+      }
+      
+      // Dynamic imports
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default;
+      const JSZip = (await import("jszip")).default;
+      const { saveAs } = await import("file-saver");
+      
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("ritase")
+        .select(`
+          *,
+          unit(kode_unit, nomor_polisi),
+          bbm(liter)
+        `)
+        .gte("tanggal", exportStartDate)
+        .lte("tanggal", exportEndDate)
+        .order("tanggal", { ascending: true });
+        
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        toast({ title: "Info", description: "Tidak ada data pada rentang tanggal tersebut", type: "warning" });
+        return;
+      }
+      
+      // Fetch logo
+      let logoBase64 = "";
+      try {
+        const response = await fetch("/logo-eme.png");
+        const blob = await response.blob();
+        logoBase64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = () => resolve(reader.result as string);
+        });
+      } catch (e) {
+        console.warn("Could not load logo", e);
+      }
+
+      // Group by Tanggal
+      const groupedByDate = data.reduce((acc, curr) => {
+        const d = curr.tanggal;
+        if (!acc[d]) acc[d] = [];
+        acc[d].push(curr);
+        return acc;
+      }, {} as Record<string, any[]>);
+      
+      const zip = new JSZip();
+      
+      for (const [dateStr, records] of Object.entries(groupedByDate)) {
+        const doc = new jsPDF("landscape", "pt", "a4");
+        
+        // --- DRAW HEADER ---
+        if (logoBase64 && logoBase64.includes("data:image")) {
+          // Adjust dimensions as needed
+          doc.addImage(logoBase64, "PNG", 40, 20, 100, 50);
+        }
+        
+        doc.setFontSize(22);
+        doc.setFont("helvetica", "bold");
+        doc.text("PT. ELKIFE MINERAL ENERGY", doc.internal.pageSize.getWidth() / 2, 40, { align: "center" });
+        
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+        doc.text("Job Site: PT. BNN-PT.HCI, Mandiodo, Konawe Utara", doc.internal.pageSize.getWidth() / 2, 55, { align: "center" });
+        
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 0, 0); // Red text
+        doc.text("RITASE UNIT DUMP TRUCK", doc.internal.pageSize.getWidth() / 2, 75, { align: "center" });
+        
+        // Reset color
+        doc.setTextColor(0, 0, 0);
+        
+        // Line separator
+        doc.setLineWidth(1.5);
+        doc.line(40, 85, doc.internal.pageSize.getWidth() - 40, 85);
+        doc.setLineWidth(0.5);
+        doc.line(40, 88, doc.internal.pageSize.getWidth() - 40, 88);
+        
+        // VENDOR & TANGGAL
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text("VENDOR", 40, 110);
+        doc.text(": PT. KPM", 130, 110);
+        
+        doc.text("HARI/TANGGAL", 40, 125);
+        // Format date
+        const dateObj = new Date(dateStr);
+        const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        const formattedDate = `${days[dateObj.getDay()]} ${String(dateObj.getDate()).padStart(2, '0')} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+        doc.text(`: ${formattedDate}`, 130, 125);
+        
+        // --- PREPARE TABLE DATA ---
+        // Group by unit inside this date
+        const unitMap = new Map();
+        for (const r of records) {
+          const uCode = r.unit?.kode_unit || r.unit?.nomor_polisi || "Unknown";
+          if (!unitMap.has(uCode)) {
+            unitMap.set(uCode, {
+               unit: uCode,
+               pitStockpile: 0,
+               pitTongkang: 0,
+               stockpileTongkang: 0,
+               quary: 0,
+               ob: 0,
+               kmAwal: r.km_awal,
+               kmAkhir: r.km_akhir,
+               hmAwal: r.hm_awal,
+               hmAkhir: r.hm_akhir,
+               solar: 0
+            });
+          }
+          const u = unitMap.get(uCode);
+          
+          if (r.jenis_pengiriman === 'Pit ke stockfile' || r.jenis_pengiriman === 'Pit ke stockpile') u.pitStockpile += r.jumlah_ritase;
+          else if (r.jenis_pengiriman === 'Pit ke tongkang') u.pitTongkang += r.jumlah_ritase;
+          else if (r.jenis_pengiriman === 'Stockpile ke tongkang') u.stockpileTongkang += r.jumlah_ritase;
+          else if (r.jenis_pengiriman === 'Quary') u.quary += r.jumlah_ritase;
+          else if (r.jenis_pengiriman === 'OB') u.ob += r.jumlah_ritase;
+          
+          if (r.km_awal && (u.kmAwal === null || r.km_awal < u.kmAwal)) u.kmAwal = r.km_awal;
+          if (r.km_akhir && (u.kmAkhir === null || r.km_akhir > u.kmAkhir)) u.kmAkhir = r.km_akhir;
+          if (r.hm_awal && (u.hmAwal === null || r.hm_awal < u.hmAwal)) u.hmAwal = r.hm_awal;
+          if (r.hm_akhir && (u.hmAkhir === null || r.hm_akhir > u.hmAkhir)) u.hmAkhir = r.hm_akhir;
+          
+          if (r.biaya_bbm || (r.bbm && r.bbm.length > 0)) {
+             const liter = r.bbm && r.bbm[0] ? r.bbm[0].liter : (r.biaya_bbm / 10000);
+             u.solar += Number(liter || 0);
+          }
+        }
+        
+        let no = 1;
+        const tableBody = [];
+        let totalPitStock = 0, totalPitTong = 0, totalStockTong = 0, totalQuary = 0, totalOB = 0;
+        
+        const sortedUnits = Array.from(unitMap.values()).sort((a, b) => a.unit.localeCompare(b.unit));
+        
+        for (const u of sortedUnits) {
+          const unitDisplay = u.unit.replace("DT-", ""); 
+          tableBody.push([
+            no++,
+            unitDisplay,
+            u.pitStockpile || "",
+            u.pitTongkang || "",
+            u.stockpileTongkang || "",
+            u.quary || "",
+            u.ob || "",
+            u.kmAwal || "",
+            u.kmAkhir || "",
+            u.hmAwal || "",
+            u.hmAkhir || "",
+            u.solar ? Math.round(u.solar) : ""
+          ]);
+          totalPitStock += u.pitStockpile;
+          totalPitTong += u.pitTongkang;
+          totalStockTong += u.stockpileTongkang;
+          totalQuary += u.quary;
+          totalOB += u.ob;
+        }
+        
+        // Add Total Row
+        tableBody.push([
+           { content: "TOTAL", colSpan: 2, styles: { halign: "center", fontStyle: "bold", fillColor: [255, 230, 204] } },
+           { content: totalPitStock || "", styles: { fontStyle: "bold", fillColor: [255, 230, 204] } },
+           { content: totalPitTong || "", styles: { fontStyle: "bold", fillColor: [255, 230, 204] } },
+           { content: totalStockTong || "", styles: { fontStyle: "bold", fillColor: [255, 230, 204] } },
+           { content: totalQuary || "", styles: { fontStyle: "bold", fillColor: [255, 230, 204] } },
+           { content: totalOB || "", styles: { fontStyle: "bold", fillColor: [255, 230, 204] } },
+           { content: "", styles: { fillColor: [255, 255, 255] } },
+           { content: "", styles: { fillColor: [255, 255, 255] } },
+           { content: "", styles: { fillColor: [255, 255, 255] } },
+           { content: "", styles: { fillColor: [255, 255, 255] } },
+           { content: "", styles: { fillColor: [255, 230, 204] } }
+        ]);
+        
+        autoTable(doc, {
+          startY: 140,
+          theme: "grid",
+          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 1, halign: "center", valign: "middle", fontStyle: "bold" },
+          bodyStyles: { lineColor: [0, 0, 0], lineWidth: 1, halign: "center", valign: "middle" },
+          columnStyles: {
+             0: { cellWidth: 30 },
+             1: { cellWidth: 50 },
+          },
+          head: [
+            [
+              { content: "NO.", rowSpan: 2 },
+              { content: "NO.\nUNIT", rowSpan: 2 },
+              { content: "RITASE", colSpan: 5 },
+              { content: "KILO METERS (KM)", colSpan: 2 },
+              { content: "HOURS METERS (HM)", colSpan: 2 },
+              { content: "SOLAR\n(GEN)", rowSpan: 2 }
+            ],
+            [
+              "PIT-\nSTOCKPILE",
+              "PIT-\nTONGKANG",
+              "STOCKPILE-\nTONGKANG",
+              "QUARY",
+              "OB",
+              "AWAL",
+              "AKHIR",
+              "AWAL",
+              "AKHIR"
+            ]
+          ],
+          body: tableBody,
+          didParseCell: function(data) {
+             if (data.section === "body" && data.row.index !== tableBody.length - 1) {
+                if (data.row.index % 2 === 0) {
+                   data.cell.styles.fillColor = [255, 245, 235];
+                }
+             }
+          }
+        });
+        
+        // SIGNATURES
+        const finalY = (doc as any).lastAutoTable.finalY + 30;
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text("PENANGGUNG JAWAB/PENGAWAS", doc.internal.pageSize.getWidth() / 2, finalY, { align: "center" });
+        doc.text("PT. KPM", doc.internal.pageSize.getWidth() / 2, finalY + 15, { align: "center" });
+        
+        doc.text("_________________________", doc.internal.pageSize.getWidth() / 2, finalY + 70, { align: "center" });
+        
+        const pdfName = `Rekap_Ritase_${dateStr}.pdf`;
+        if (Object.keys(groupedByDate).length === 1) {
+          doc.save(pdfName);
+        } else {
+          zip.file(pdfName, doc.output('blob'));
+        }
+      }
+      
+      if (Object.keys(groupedByDate).length > 1) {
+         const zipBlob = await zip.generateAsync({ type: "blob" });
+         saveAs(zipBlob, `Rekap_Ritase_${exportStartDate}_sd_${exportEndDate}.zip`);
+      }
+      
+      toast({ title: "Sukses", description: "Berhasil mengexport rekap ritase", type: "success" });
+      setIsExportOpen(false);
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Gagal", description: e.message || "Terjadi kesalahan saat mengexport", type: "error" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const getPaginationGroup = () => {
     const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
     const end = Math.min(totalPages, Math.max(currentPage + 2, 5));
@@ -385,9 +668,14 @@ export default function RitasePage() {
           <h1 className="text-2xl font-extrabold tracking-tight">Ritase </h1>
           <p className="text-xs text-muted-foreground">Catat dan validasikan hauling dump truck harian</p>
         </div>
-        <Button onClick={openAddDialog} className="bg-orange-500 hover:bg-orange-600 text-white gap-2 text-xs">
-          <Plus size={16} /> Input Ritase
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsExportOpen(true)} variant="outline" className="gap-2 text-xs border-zinc-300">
+            <Download size={16} /> Export Rekap
+          </Button>
+          <Button onClick={openAddDialog} className="bg-orange-500 hover:bg-orange-600 text-white gap-2 text-xs">
+            <Plus size={16} /> Input Ritase
+          </Button>
+        </div>
       </div>
 
       {/* Controls */}
@@ -441,11 +729,11 @@ export default function RitasePage() {
                     <Checkbox
                       checked={
                         paginatedList.length > 0 &&
-                        paginatedList.every((r) => selectedIds.includes(r.id))
+                          paginatedList.every((r) => selectedIds.includes(r.id))
                           ? true
                           : paginatedList.some((r) => selectedIds.includes(r.id))
-                          ? "indeterminate"
-                          : false
+                            ? "indeterminate"
+                            : false
                       }
                       onCheckedChange={(checked) => {
                         if (checked) {
@@ -539,10 +827,10 @@ export default function RitasePage() {
                       <div className="flex flex-col items-center gap-0.5">
                         <span
                           className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold border ${r.status === "Approved"
-                              ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
-                              : r.status === "Rejected"
-                                ? "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400"
-                                : "bg-zinc-100 border-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-400"
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400"
+                            : r.status === "Rejected"
+                              ? "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400"
+                              : "bg-zinc-100 border-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-400"
                             }`}
                         >
                           {r.status}
@@ -560,62 +848,48 @@ export default function RitasePage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        {showSupervisorApproval && (
-                          <>
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerApprove(r.id);
-                              }}
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10"
-                              title="Setujui"
-                            >
-                              <Check size={14} />
-                            </Button>
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerReject(r.id);
-                              }}
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-500/10"
-                              title="Tolak"
-                            >
-                              <X size={14} />
-                            </Button>
-                          </>
-                        )}
-                        {canEdit && (
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditDialog(r);
-                            }}
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          >
-                            <Edit2 size={14} />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Buka menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
-                        )}
-                        {isManager && (
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(r.id);
-                            }}
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        )}
-                      </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {showSupervisorApproval && (
+                            <>
+                              <DropdownMenuItem onClick={() => triggerApprove(r.id)} className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50">
+                                <Check className="mr-2 h-4 w-4" />
+                                Setujui Ritase
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => triggerReject(r.id)} className="text-rose-600 focus:text-rose-600 focus:bg-rose-50">
+                                <X className="mr-2 h-4 w-4" />
+                                Tolak Ritase
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          <DropdownMenuItem onClick={() => setSelectedRitaseDetail(r)}>
+                            <Info className="mr-2 h-4 w-4 text-orange-500" />
+                            Lihat Detail
+                          </DropdownMenuItem>
+                          {canEdit && (
+                            <DropdownMenuItem onClick={() => openEditDialog(r)}>
+                              <Edit2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Edit Data
+                            </DropdownMenuItem>
+                          )}
+                          {isManager && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDelete(r.id)} className="text-rose-500 focus:text-rose-600 focus:bg-rose-50">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Hapus Data
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 );
@@ -675,7 +949,7 @@ export default function RitasePage() {
 
       {/* Input / Edit Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold">
               {editRitase ? "Ubah Log Ritase Hauling" : "Catat Ritase Hauling Baru"}
@@ -853,6 +1127,7 @@ export default function RitasePage() {
                     <SelectItem value="Pit ke stockfile">Pit ke stockfile</SelectItem>
                     <SelectItem value="Quary">Quary</SelectItem>
                     <SelectItem value="Stockpile ke tongkang">Stockpile ke tongkang</SelectItem>
+                    <SelectItem value="OB">OB</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -865,6 +1140,54 @@ export default function RitasePage() {
                   onChange={(e) => setVolumeBbm(e.target.value)}
                   className="text-xs h-9"
                   placeholder="Liter"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">KM Awal</label>
+                <Input
+                  type="number"
+                  value={kmAwal}
+                  onChange={(e) => setKmAwal(e.target.value)}
+                  className="text-xs h-9"
+                  placeholder="Kilo Meter Awal"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">KM Akhir</label>
+                <Input
+                  type="number"
+                  value={kmAkhir}
+                  onChange={(e) => setKmAkhir(e.target.value)}
+                  className="text-xs h-9"
+                  placeholder="Kilo Meter Akhir"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">HM Awal</label>
+                <Input
+                  type="number"
+                  value={hmAwal}
+                  onChange={(e) => setHmAwal(e.target.value)}
+                  className="text-xs h-9"
+                  placeholder="Hours Meter Awal"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">HM Akhir</label>
+                <Input
+                  type="number"
+                  value={hmAkhir}
+                  onChange={(e) => setHmAkhir(e.target.value)}
+                  className="text-xs h-9"
+                  placeholder="Hours Meter Akhir"
                 />
               </div>
             </div>
@@ -979,6 +1302,49 @@ export default function RitasePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Export Dialog */}
+      <Dialog open={isExportOpen} onOpenChange={setIsExportOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold flex items-center gap-2">
+              <Download className="h-5 w-5 text-orange-500" />
+              Export Rekap Harian (PDF)
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Pilih rentang tanggal untuk mengunduh rekap harian ritase. Jika lebih dari 1 hari, file akan didownload sebagai ZIP.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Tanggal Mulai</label>
+              <Input
+                type="date"
+                value={exportStartDate}
+                onChange={(e) => setExportStartDate(e.target.value)}
+                className="text-xs h-9"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Tanggal Akhir</label>
+              <Input
+                type="date"
+                value={exportEndDate}
+                onChange={(e) => setExportEndDate(e.target.value)}
+                className="text-xs h-9"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsExportOpen(false)} className="text-xs h-9">
+              Batal
+            </Button>
+            <Button type="button" onClick={handleExportRange} disabled={isExporting} className="bg-zinc-800 hover:bg-zinc-900 text-white text-xs h-9">
+              {isExporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Proses...</> : "Download"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Detail Ritase Dialog */}
       <Dialog open={!!selectedRitaseDetail} onOpenChange={() => setSelectedRitaseDetail(null)}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -995,19 +1361,19 @@ export default function RitasePage() {
             <div className="space-y-4 py-2">
               {/* Status Header Block */}
               <div className={`p-3 rounded-lg border flex flex-col gap-2 ${selectedRitaseDetail.status === "Approved"
-                  ? "bg-emerald-50/50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/50 dark:text-emerald-300"
-                  : selectedRitaseDetail.status === "Rejected"
-                    ? "bg-rose-50/50 border-rose-200 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900/50 dark:text-rose-300"
-                    : "bg-zinc-50 border-zinc-200 text-zinc-800 dark:bg-zinc-900/40 dark:border-zinc-800 dark:text-zinc-300"
+                ? "bg-emerald-50/50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/50 dark:text-emerald-300"
+                : selectedRitaseDetail.status === "Rejected"
+                  ? "bg-rose-50/50 border-rose-200 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900/50 dark:text-rose-300"
+                  : "bg-zinc-50 border-zinc-200 text-zinc-800 dark:bg-zinc-900/40 dark:border-zinc-800 dark:text-zinc-300"
                 }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Status Log</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${selectedRitaseDetail.status === "Approved"
-                        ? "bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-900/50 dark:border-emerald-800 dark:text-emerald-400"
-                        : selectedRitaseDetail.status === "Rejected"
-                          ? "bg-rose-100 border-rose-300 text-rose-800 dark:bg-rose-900/50 dark:border-rose-800 dark:text-rose-400"
-                          : "bg-zinc-200 border-zinc-300 text-zinc-800 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400"
+                      ? "bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-900/50 dark:border-emerald-800 dark:text-emerald-400"
+                      : selectedRitaseDetail.status === "Rejected"
+                        ? "bg-rose-100 border-rose-300 text-rose-800 dark:bg-rose-900/50 dark:border-rose-800 dark:text-rose-400"
+                        : "bg-zinc-200 border-zinc-300 text-zinc-800 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400"
                       }`}>
                       {selectedRitaseDetail.status}
                     </span>
@@ -1108,6 +1474,22 @@ export default function RitasePage() {
                       <span className="text-muted-foreground">Tipe Unit:</span>
                       <span className="font-semibold">{selectedRitaseDetail.unit?.tipe || "-"}</span>
                     </div>
+                    {(selectedRitaseDetail.km_awal != null || selectedRitaseDetail.km_akhir != null) && (
+                      <div className="flex justify-between border-t pt-1.5 mt-1.5">
+                        <span className="text-muted-foreground">KM Awal - Akhir:</span>
+                        <span className="font-semibold">
+                          {selectedRitaseDetail.km_awal ?? "-"} - {selectedRitaseDetail.km_akhir ?? "-"}
+                        </span>
+                      </div>
+                    )}
+                    {(selectedRitaseDetail.hm_awal != null || selectedRitaseDetail.hm_akhir != null) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">HM Awal - Akhir:</span>
+                        <span className="font-semibold">
+                          {selectedRitaseDetail.hm_awal ?? "-"} - {selectedRitaseDetail.hm_akhir ?? "-"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

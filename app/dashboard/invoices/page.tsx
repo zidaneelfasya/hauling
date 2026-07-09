@@ -8,7 +8,8 @@ import {
   createInvoice,
   updateInvoice,
   deleteInvoice,
-  getNextInvoiceNumber
+  getNextInvoiceNumber,
+  calculateInvoiceData
 } from "@/app/actions/invoice";
 import { getKontrakHauling } from "@/app/actions/master";
 import { toast } from "@/hooks/use-toast";
@@ -60,8 +61,14 @@ export default function InvoicesPage() {
   const [tanggalInvoice, setTanggalInvoice] = useState("");
   const [kontrakHaulingId, setKontrakHaulingId] = useState("");
   const [periode, setPeriode] = useState("");
-  const [totalTagihan, setTotalTagihan] = useState<string>("50000000");
+  const [tanggalMulai, setTanggalMulai] = useState("");
+  const [tanggalSelesai, setTanggalSelesai] = useState("");
+  const [totalRitase, setTotalRitase] = useState(0);
+  const [grossTotal, setGrossTotal] = useState(0);
+  const [potongan, setPotongan] = useState<string>("0");
+  const [totalTagihan, setTotalTagihan] = useState<string>("0");
   const [status, setStatus] = useState<"Draft" | "Sent" | "Paid">("Draft");
+  const [isCalculating, setIsCalculating] = useState(false);
 
   // Fetch session profile
   useEffect(() => {
@@ -140,8 +147,13 @@ export default function InvoicesPage() {
     }
     setTanggalInvoice(new Date().toISOString().substring(0, 10));
     setKontrakHaulingId(kontrakList[0]?.id || "");
-    setPeriode("Juni 2026");
-    setTotalTagihan("150000000");
+    setPeriode("");
+    setTanggalMulai("");
+    setTanggalSelesai("");
+    setTotalRitase(0);
+    setGrossTotal(0);
+    setPotongan("0");
+    setTotalTagihan("0");
     setStatus("Draft");
     setIsOpen(true);
   };
@@ -152,6 +164,11 @@ export default function InvoicesPage() {
     setTanggalInvoice(inv.tanggal_invoice);
     setKontrakHaulingId(inv.kontrak_hauling_id);
     setPeriode(inv.periode);
+    setTanggalMulai(inv.tanggal_mulai || "");
+    setTanggalSelesai(inv.tanggal_selesai || "");
+    setTotalRitase(inv.total_ritase || 0);
+    setPotongan(String(inv.potongan || 0));
+    setGrossTotal((Number(inv.total_tagihan) || 0) + (Number(inv.potongan) || 0));
     setTotalTagihan(String(inv.total_tagihan));
     setStatus(inv.status);
     setIsOpen(true);
@@ -161,9 +178,46 @@ export default function InvoicesPage() {
     setIsOpen(false);
   };
 
+  const handleCalculate = async () => {
+    if (!kontrakHaulingId || !tanggalMulai || !tanggalSelesai) {
+      toast({ title: "Peringatan", description: "Pilih kontrak, tanggal mulai, dan tanggal selesai terlebih dahulu.", type: "warning" });
+      return;
+    }
+    
+    setIsCalculating(true);
+    try {
+      const data = await calculateInvoiceData(kontrakHaulingId, tanggalMulai, tanggalSelesai);
+      setTotalRitase(data.totalRitase);
+      setGrossTotal(data.grossTotal);
+      
+      const p = Number(potongan) || 0;
+      setTotalTagihan(String(data.grossTotal - p));
+      
+      // Auto-generate periode text
+      const dateStart = new Date(tanggalMulai);
+      const dateEnd = new Date(tanggalSelesai);
+      const mStart = dateStart.toLocaleString('id-ID', { month: 'short' });
+      const mEnd = dateEnd.toLocaleString('id-ID', { month: 'short' });
+      const y = dateEnd.getFullYear();
+      setPeriode(`${dateStart.getDate()} ${mStart} - ${dateEnd.getDate()} ${mEnd} ${y}`);
+      
+      toast({ title: "Berhasil", description: `Ditemukan ${data.totalRitase} ritase dengan total kotor Rp${data.grossTotal.toLocaleString('id-ID')}`, type: "success" });
+    } catch (err: any) {
+      toast({ title: "Gagal", description: err.message || "Gagal menghitung invoice", type: "error" });
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  // Auto-update total tagihan when potongan changes
+  useEffect(() => {
+    const p = Number(potongan) || 0;
+    setTotalTagihan(String(grossTotal - p));
+  }, [potongan, grossTotal]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomorInvoice || !tanggalInvoice || !kontrakHaulingId || !periode) {
+    if (!nomorInvoice || !tanggalInvoice || !kontrakHaulingId || !periode || !tanggalMulai || !tanggalSelesai) {
       toast({ title: "Peringatan", description: "Semua kolom wajib diisi", type: "warning" });
       return;
     }
@@ -173,6 +227,10 @@ export default function InvoicesPage() {
       tanggal_invoice: tanggalInvoice,
       kontrak_hauling_id: kontrakHaulingId,
       periode,
+      tanggal_mulai: tanggalMulai,
+      tanggal_selesai: tanggalSelesai,
+      total_ritase: totalRitase,
+      potongan: Number(potongan) || 0,
       total_tagihan: Number(totalTagihan) || 0,
       status,
     };
@@ -262,11 +320,33 @@ export default function InvoicesPage() {
       y += 10;
       doc.setFont("helvetica", "normal");
       doc.setTextColor(30, 41, 59);
-      doc.rect(leftMargin, y, 170, 15, "S");
-      doc.text(`Jasa Angkutan Hauling Material Bijih Nikel - Periode ${inv.periode}`, leftMargin + 4, y + 9);
+      doc.rect(leftMargin, y, 170, 35, "S");
+      
+      doc.text(`Jasa Angkutan Hauling Material Bijih Nikel`, leftMargin + 4, y + 8);
+      doc.text(`Periode: ${inv.periode}`, leftMargin + 4, y + 14);
+      doc.text(`Total Ritase: ${inv.total_ritase || 0} Rit`, leftMargin + 4, y + 20);
+
+      // Gross Amount
+      const gross = (Number(inv.total_tagihan) || 0) + (Number(inv.potongan) || 0);
+      doc.text(`Subtotal:`, rightMargin - 60, y + 14);
+      doc.text(`Rp ${gross.toLocaleString("id-ID")}`, rightMargin - 40, y + 14);
+      
+      // Deduction
+      if (Number(inv.potongan) > 0) {
+        doc.text(`Potongan:`, rightMargin - 60, y + 20);
+        doc.setTextColor(220, 38, 38); // Red for deduction
+        doc.text(`- Rp ${Number(inv.potongan).toLocaleString("id-ID")}`, rightMargin - 40, y + 20);
+      }
+
+      doc.setDrawColor(214, 219, 225);
+      doc.line(leftMargin + 2, y + 25, rightMargin - 2, y + 25);
       
       doc.setFont("helvetica", "bold");
-      doc.text(`Rp ${Number(inv.total_tagihan).toLocaleString("id-ID")}`, rightMargin - 40, y + 9);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`TOTAL KESELURUHAN:`, leftMargin + 4, y + 31);
+      doc.text(`Rp ${Number(inv.total_tagihan).toLocaleString("id-ID")}`, rightMargin - 40, y + 31);
+      
+      y += 20;
 
       // Bottom Watermark for Status
       y += 30;
@@ -556,24 +636,84 @@ export default function InvoicesPage() {
               </div>
 
               <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Tanggal Mulai</label>
+                <Input
+                  type="date"
+                  value={tanggalMulai}
+                  onChange={(e) => setTanggalMulai(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Tanggal Selesai</label>
+                <Input
+                  type="date"
+                  value={tanggalSelesai}
+                  onChange={(e) => setTanggalSelesai(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 items-end">
+              <div className="space-y-1">
                 <label className="text-[11px] font-bold text-muted-foreground uppercase">Periode Penagihan</label>
                 <Input
                   placeholder="Juni 2026"
                   value={periode}
                   onChange={(e) => setPeriode(e.target.value)}
                   className="text-xs h-9"
+                  readOnly
+                />
+              </div>
+              <Button type="button" onClick={handleCalculate} disabled={isCalculating} className="h-9 text-xs bg-indigo-500 hover:bg-indigo-600 text-white w-full">
+                {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Hitung Otomatis"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Total Ritase</label>
+                <Input
+                  type="number"
+                  value={totalRitase}
+                  readOnly
+                  className="text-xs h-9 bg-muted/50"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Subtotal Kotor (Rp)</label>
+                <Input
+                  type="text"
+                  value={grossTotal.toLocaleString('id-ID')}
+                  readOnly
+                  className="text-xs h-9 bg-muted/50 font-mono"
                 />
               </div>
             </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Potongan (Rp)</label>
+                <Input
+                  type="number"
+                  value={potongan}
+                  onChange={(e) => setPotongan(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
 
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-muted-foreground uppercase">Total Tagihan Bijih Nikel (Rp)</label>
-              <Input
-                type="number"
-                value={totalTagihan}
-                onChange={(e) => setTotalTagihan(e.target.value)}
-                className="text-xs h-9"
-              />
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase">Total Tagihan Bersih (Rp)</label>
+                <Input
+                  type="text"
+                  value={Number(totalTagihan).toLocaleString('id-ID')}
+                  readOnly
+                  className="text-xs h-9 bg-muted/50 font-bold font-mono text-orange-600 dark:text-orange-400"
+                />
+              </div>
             </div>
 
             <div className="space-y-1">

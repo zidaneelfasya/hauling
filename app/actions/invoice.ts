@@ -37,11 +37,40 @@ export async function getInvoices() {
   return data;
 }
 
+export async function calculateInvoiceData(kontrakHaulingId: string, startDate: string, endDate: string) {
+  await verifyManagerRole();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("ritase")
+    .select("jumlah_ritase, tarif_per_ritase")
+    .eq("kontrak_hauling_id", kontrakHaulingId)
+    .gte("tanggal", startDate)
+    .lte("tanggal", endDate)
+    .eq("status", "Approved");
+
+  if (error) throw error;
+
+  let totalRitase = 0;
+  let grossTotal = 0;
+
+  data.forEach((rit) => {
+    totalRitase += rit.jumlah_ritase;
+    grossTotal += (rit.jumlah_ritase * Number(rit.tarif_per_ritase));
+  });
+
+  return { totalRitase, grossTotal };
+}
+
 export async function createInvoice(formData: {
   nomor_invoice: string;
   tanggal_invoice: string;
   kontrak_hauling_id: string;
   periode: string;
+  tanggal_mulai: string;
+  tanggal_selesai: string;
+  total_ritase: number;
+  potongan: number;
   total_tagihan: number;
   status: "Draft" | "Sent" | "Paid";
 }) {
@@ -71,6 +100,10 @@ export async function updateInvoice(
     tanggal_invoice: string;
     kontrak_hauling_id: string;
     periode: string;
+    tanggal_mulai: string;
+    tanggal_selesai: string;
+    total_ritase: number;
+    potongan: number;
     total_tagihan: number;
     status: "Draft" | "Sent" | "Paid";
   }
